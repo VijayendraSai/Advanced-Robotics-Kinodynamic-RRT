@@ -1,0 +1,40 @@
+\documentclass{article} 
+
+\title{Homework Assignment 2}
+\author{Mark Dougthen}
+\date{March 31, 2024}
+
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{float}
+
+\begin{document}
+\maketitle
+
+\section*{Problem 1a}
+
+If $B$ is $D \times D$ matrix, then $A$ is a $D \times D$ matrix. $A$ does not need to be symmetric. The existence of a square root matrix depends on the eigenvalues and eigenvectors.
+
+\begin{equation}
+  w_{T+1} = w_T + K_{T+1} \left(y_{T+1} - x_{T+1}^T w_T\right)
+\end{equation}
+
+\begin{equation}
+  K_{T+1} = \frac{R_T^{-1} x_{T+1}}{1 + x_{T+1}^T R_T^{-1} x_{T+1}}
+\end{equation}
+
+\begin{align}
+  M^TM\vec{v}_{i} &= \lambda _{i}\vec{v}_{i} \\
+  M\vec{v}_{i}\cdot M\vec{v}_{j} &= 0 \\
+  (M\vec{v}_{i})^T(M\vec{v}_{j}) &= 0 \\
+  M^T\vec{v}_{i}^TM\vec{v}_{j} &= 0 \\
+  \vec{V}_{i}M^TM\vec{v}_{j} &= 0 \\
+  \vec{v}_{i}^T(\lambda_j\vec{v}_{j}) &= 0 \\
+  \lambda _{i}(\vec{v}_{i}^T\vec{v}_{j}) &= 0
+\end{align}
+
+The eigenvalues are positive, and the matrix is orthogonal and diagonalizable.
+
+\end{document}
