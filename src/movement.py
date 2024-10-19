@@ -10,7 +10,7 @@ class Node:
         self.parent = parent
         self.control = None
 
-def kinodynamic_rrt(start_pos, goal_pos, walls, model, data, window, scene, context, options, viewport, camera, N=100000):
+def kinodynamic_rrt(start_pos, goal_pos, walls, N=100000):
     
     T = [Node(start_pos)]  # Initialize the tree with the start node
     accepted_distance = 0.1
@@ -44,7 +44,7 @@ def choose_control(xnear, xrand):
 def simulate(xnear, control, dt=0.05):
     return np.array(xnear) + np.array(control) * dt
 
-def is_collision_free(xe, walls, safety_margin=0):
+def is_collision_free(xe, walls, safety_margin=.15):
     # Check if the new position is out of bounds
     if xe[0] < -0.5 or xe[0] > 1.5 or xe[1] < -0.4 or xe[1] > 0.4:
         return False  # Outside the map bounds
@@ -72,9 +72,9 @@ def construct_path(node):
     return path[::-1]  # Return the path from start to goal
 
 def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=None, outside_walls=None):
-    plt.figure(figsize=(8, 6))
-
+    
     # Plot 2D walls as boxes if provided
+    plt.figure(figsize=(8, 6))
     if walls:
         for wall, coordinates in walls.items():
             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
@@ -208,28 +208,24 @@ if __name__ == "__main__":
         [[-0.5, -0.4], [-0.5, 0.4]],
         [[1.5, -0.4], [1.5, 0.4]],
         [[-0.5, 0.4], [1.5, 0.4]],
-        [[-0.5, -0.4], [1.5, -0.4]],
-    ]
+        [[-0.5, -0.4], [1.5, -0.4]]]
 
     # Define the middle obstacle
     walls = {
-        "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]],
-    }
-
-    # Initialize the window and visualization structures
-    window, camera, scene, context, options, viewport = init_glfw_window(model)
+        "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]}
 
     # Define the start and goal positions
     start_pos = [0, 0]  # Starting at the origin
     goal_pos = [0.9, 0]  # Goal position based on XML map
 
     # Perform Kinodynamic-RRT to find a path
-    path = kinodynamic_rrt(start_pos, goal_pos, walls, model, data, window, scene, context, options, viewport, camera)
+    path = kinodynamic_rrt(start_pos, goal_pos, walls)
     print(path)
-    
-    plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
 
     if path:
+        plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+        # Initialize the window and visualization structures
+        window, camera, scene, context, options, viewport = init_glfw_window(model)
         print(f"Path found: {path}")
         # Control the ball to follow the path
         for target_pos in path:
