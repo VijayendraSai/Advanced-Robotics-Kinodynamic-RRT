@@ -134,7 +134,7 @@ def move_ball_to_position(model, data, target_pos, window, scene, context, optio
         slowing_factor = min(distance_to_target, 1)  # Slow down when closer to the target (faster when far)
         
         # Proportional control with ramp-up and slowing factor
-        ball_vel = direction * slowing_factor * ramp_up_factor * 0.3  # Increase velocity scaling factor
+        ball_vel = direction * slowing_factor * ramp_up_factor * 2  # Increase velocity scaling factor
         
         # Clamp the velocity to max speed to avoid overshooting
         ball_vel = np.clip(ball_vel, -max_speed, max_speed)
@@ -186,7 +186,7 @@ def init_glfw_window(model):
     
     # camera settings
     camera.distance = 3.0
-    camera.elevation = -90.0
+    camera.elevation = -45.0
     camera.azimuth = 0.0
 
     # Set viewport
