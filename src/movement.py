@@ -4,6 +4,33 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 
+class PIDController:
+    def __init__(self, kp, ki, kd, setpoint=0):
+        self.kp = kp  # Proportional gain
+        self.ki = ki  # Integral gain
+        self.kd = kd  # Derivative gain
+        self.setpoint = setpoint  # Target value
+        self.previous_error = 0
+        self.integral = 0
+
+    def compute(self, current_value, dt):
+        # Compute error between current position and setpoint
+        error = self.setpoint - current_value
+        
+        # Proportional term
+        p_term = self.kp * error
+        
+        # Integral term (summing errors over time)
+        self.integral += error * dt
+        i_term = self.ki * self.integral
+        
+        # Derivative term (rate of change of error)
+        d_term = self.kd * (error - self.previous_error) / dt
+        self.previous_error = error
+        
+        # Combine the terms to compute the control output
+        return p_term + i_term + d_term
+
 class Node:
     def __init__(self, position, parent=None):
         self.position = position
@@ -114,34 +141,30 @@ def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=No
     
     return
 
-def move_ball_to_position(model, data, target_pos, window, scene, context, options, viewport, camera):
+def move_ball_to_position_with_pid(model, data, target_pos, window, scene, context, options, viewport, camera, pid_x, pid_y):
     
     ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")  # Get ball body ID
-    ramp_up_factor = 0.2  # Start ramp-up factor higher for quicker initial speed
-    max_speed = 1  # Maximum allowed speed to prevent overshooting
+    dt = 0.01  # Simulation timestep
 
     while True:
-        ball_pos = data.xpos[ball_id][:2]  # Get ball position (x, y)
+        ball_pos = data.xpos[ball_id][:2]  # Get current ball position (x, y)
+        distance_to_target = np.linalg.norm(np.array(target_pos[:2]) - ball_pos)
 
-        # Compute the direction to move in
-        direction = np.array(target_pos[:2]) - ball_pos
-        distance_to_target = np.linalg.norm(direction)
-
-        # Slowly ramp up the velocity as the ball moves from the checkpoint
-        ramp_up_factor = min(ramp_up_factor + 0.05, 1.0)  # Increase ramp-up factor faster
-
-        # Slow down the ball as it approaches the target by scaling the velocity with distance
-        slowing_factor = min(distance_to_target, 1)  # Slow down when closer to the target (faster when far)
+        # Update PID controllers for x and y directions
+        pid_x.setpoint = target_pos[0]
+        pid_y.setpoint = target_pos[1]
         
-        # Proportional control with ramp-up and slowing factor
-        ball_vel = direction * slowing_factor * ramp_up_factor * 2  # Increase velocity scaling factor
+        control_x = pid_x.compute(ball_pos[0], dt)
+        control_y = pid_y.compute(ball_pos[1], dt)
         
-        # Clamp the velocity to max speed to avoid overshooting
-        ball_vel = np.clip(ball_vel, -max_speed, max_speed)
+        # Clamp the control signal to prevent overshooting
+        max_speed = 1.0
+        control_x = np.clip(control_x, -max_speed, max_speed)
+        control_y = np.clip(control_y, -max_speed, max_speed)
 
         # Apply control to the ball's actuators
-        data.ctrl[0] = ball_vel[0]  # x direction control
-        data.ctrl[1] = ball_vel[1]  # y direction control
+        data.ctrl[0] = control_x  # x direction control
+        data.ctrl[1] = control_y  # y direction control
         
         mujoco.mj_step(model, data)
 
@@ -155,13 +178,9 @@ def move_ball_to_position(model, data, target_pos, window, scene, context, optio
         # Swap the front and back buffers
         glfw.swap_buffers(window)
 
-        print(f'pos: {ball_pos}, speed: {ball_vel}, distance_to_target: {distance_to_target}, ramp_up_factor: {ramp_up_factor}')
+        print(f'pos: {ball_pos}, control_x: {control_x}, control_y: {control_y}, distance_to_target: {distance_to_target}')
 
-        # Apply a stronger brake when very close to the target
-        if distance_to_target < 0.1:
-            ramp_up_factor = 0.1  # Reduce ramp-up to stop acceleration near the target
-
-        # Stop if ball is close enough to the target position
+        # Stop if the ball is close enough to the target position
         if distance_to_target < 0.05:
             print("Reached checkpoint")
             break
@@ -226,10 +245,15 @@ if __name__ == "__main__":
         plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
         # Initialize the window and visualization structures
         window, camera, scene, context, options, viewport = init_glfw_window(model)
+        
         print(f"Path found: {path}")
         # Control the ball to follow the path
+        # Create PID controllers for x and y coordinates
+        pid_x = PIDController(kp=0.1, ki=0.0, kd=0.40)  # Lower kp, higher kd
+        pid_y = PIDController(kp=0.1, ki=0.0, kd=0.40)
+
         for target_pos in path:
-            move_ball_to_position(model, data, target_pos, window, scene, context, options, viewport, camera)
+            move_ball_to_position_with_pid(model, data, target_pos, window, scene, context, options, viewport, camera, pid_x, pid_y)
     else:
         print("No path found")
 
