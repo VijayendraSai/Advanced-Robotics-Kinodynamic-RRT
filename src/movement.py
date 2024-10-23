@@ -214,181 +214,49 @@ def init_glfw_window(model):
     # Return the window, camera, scene, context, options, and viewport for rendering
     return window, camera, scene, context, options, viewport
 
-
-
-
-######################################################################################################
-
-def visualize_tree(T, walls, goal_area, outside_walls):
-    plt.figure(figsize=(8, 6))
+# Using the RRT in the main function
+if __name__ == "__main__":
     
-    # Plot walls and obstacles
-    if walls:
-        for wall, coordinates in walls.items():
-            wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
-            plt.gca().add_patch(wall_polygon)
+    # Load the MuJoCo model
+    # model = mujoco.MjModel.from_xml_path("ball_square.xml")
+    model = mujoco.MjModel.from_xml_path("ball_square.xml")
+    data = mujoco.MjData(model)
+    goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
     
-    # Plot tree edges
-    for node in T:
-        if node.parent is not None:
-            plt.plot([node.position[0], node.parent.position[0]], 
-                    [node.position[1], node.parent.position[1]], 
-                    'b-', alpha=0.3)
-    
-    # Plot start and current nodes
-    plt.plot(T[0].position[0], T[0].position[1], 'go', label='Start')
-    
-    plt.xlim(-0.6, 1.6)
-    plt.ylim(-0.5, 0.5)
-    plt.grid(True)
-    plt.title("RRT Tree Growth")
-    plt.show()
-
-def run_trials(num_trials, max_time, seed_start=0):
-    success_count = 0
-    execution_times = []
-    
-    for trial in range(num_trials):
-        random.seed(seed_start + trial)
-        np.random.seed(seed_start + trial)
-        
-        start_time = time.time()
-        path = kinodynamic_rrt(start_pos, goal_pos, walls)
-        execution_time = time.time() - start_time
-        
-        if path and execution_time <= max_time:
-            success_count += 1
-            execution_times.append(execution_time)
-            
-        print(f"Trial {trial + 1}: {'Success' if path else 'Failure'}, "
-              f"Time: {execution_time:.2f}s")
-    
-    success_rate = (success_count / num_trials) * 100
-    avg_time = np.mean(execution_times) if execution_times else 0
-    
-    return success_rate, avg_time
-
-def evaluate_time_limits():
-    time_limits = [5, 10, 20, 30]
-    results = {}
-    
-    for max_time in time_limits:
-        print(f"\nTesting with Tmax = {max_time} seconds")
-        success_rate, avg_time = run_trials(30, max_time)
-        results[max_time] = {
-            'success_rate': success_rate,
-            'avg_time': avg_time
-        }
-        print(f"Success Rate: {success_rate:.2f}%")
-        print(f"Average Time: {avg_time:.2f}s")
-    
-    return results
-
-
-def setup_environment():
-    # Define the environment parameters
-    start_pos = np.array([0.0, 0.0])  # Starting at origin
-    goal_pos = np.array([0.9, 0.0])   # Goal position
-    
-    # Define walls and obstacles
-    walls = {
-        "wall_3": [[0.5, -0.15], [0.5, 0.15], 
-                   [0.6, 0.15], [0.6, -0.15]]
-    }
-    
-    # Define goal area
-    goal_area = [[0.9, -0.3], [0.9, 0.3], 
-                 [1.1, 0.3], [1.1, -0.3]]
-    
-    # Define outside walls
+    # Define outside walls as lines
     outside_walls = [
         [[-0.5, -0.4], [-0.5, 0.4]],
         [[1.5, -0.4], [1.5, 0.4]],
         [[-0.5, 0.4], [1.5, 0.4]],
-        [[-0.5, -0.4], [1.5, -0.4]]
-    ]
-    
-    return start_pos, goal_pos, walls, goal_area, outside_walls
+        [[-0.5, -0.4], [1.5, -0.4]]]
 
-if __name__ == "__main__":
-    # Setup environment
-    start_pos, goal_pos, walls, goal_area, outside_walls = setup_environment()
-    
-    # Load the MuJoCo model
-    model_path = "/Users/shubham/Documents/Rutgers University/MS in Data Science/Fall 2024/Advanced Robotics/Project/Advanced_Robotics/src/ball_square.xml"
-    model = mujoco.MjModel.from_xml_path(model_path)
-    data = mujoco.MjData(model)
-    
-    # Visualize 5 different trees
-    print("Generating 5 different trees...")
-    for i in range(5):
-        random.seed(i)
-        np.random.seed(i)
-        T = [Node(start_pos)]  # Initialize tree
-        path = kinodynamic_rrt(start_pos, goal_pos, walls)
-        visualize_tree(T, walls, goal_area, outside_walls)
-    
-    # Run evaluation with different time limits
-    print("\nEvaluating different time limits...")
-    results = evaluate_time_limits()
-    
-    # Print final results
-    print("\nFinal Results:")
-    for max_time, metrics in results.items():
-        print(f"\nTmax = {max_time} seconds:")
-        print(f"Success Rate: {metrics['success_rate']:.2f}%")
-        print(f"Average Time: {metrics['avg_time']:.2f}s")
+    # Define the middle obstacle
+    walls = {
+        "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]}
 
-    # Close any remaining windows
-    plt.close('all')
-######################################################################################################
+    # Define the start and goal positions
+    start_pos = [0, 0]  # Starting at the origin
+    goal_pos = [0.9, 0]  # Goal position based on XML map
 
+    # Perform Kinodynamic-RRT to find a path
+    path = kinodynamic_rrt(start_pos, goal_pos, walls)
+    print(path)
 
-
-
-# Using the RRT in the main function
-# if __name__ == "__main__":
-    
-#     # Load the MuJoCo model
-#     # model = mujoco.MjModel.from_xml_path("ball_square.xml")
-#     model = mujoco.MjModel.from_xml_path("/Users/shubham/Documents/Rutgers University/MS in Data Science/Fall 2024/Advanced Robotics/Project/Advanced_Robotics/src/ball_square.xml")
-#     data = mujoco.MjData(model)
-#     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
-    
-#     # Define outside walls as lines
-#     outside_walls = [
-#         [[-0.5, -0.4], [-0.5, 0.4]],
-#         [[1.5, -0.4], [1.5, 0.4]],
-#         [[-0.5, 0.4], [1.5, 0.4]],
-#         [[-0.5, -0.4], [1.5, -0.4]]]
-
-#     # Define the middle obstacle
-#     walls = {
-#         "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]}
-
-#     # Define the start and goal positions
-#     start_pos = [0, 0]  # Starting at the origin
-#     goal_pos = [0.9, 0]  # Goal position based on XML map
-
-#     # Perform Kinodynamic-RRT to find a path
-#     path = kinodynamic_rrt(start_pos, goal_pos, walls)
-#     print(path)
-
-#     if path:
-#         plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
-#         # Initialize the window and visualization structures
-#         window, camera, scene, context, options, viewport = init_glfw_window(model)
+    if path:
+        plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+        # Initialize the window and visualization structures
+        window, camera, scene, context, options, viewport = init_glfw_window(model)
         
-#         print(f"Path found: {path}")
-#         # Control the ball to follow the path
-#         # Create PID controllers for x and y coordinates
-#         pid_x = PIDController(kp=0.1, ki=0.0, kd=0.40)  # Lower kp, higher kd
-#         pid_y = PIDController(kp=0.1, ki=0.0, kd=0.40)
+        print(f"Path found: {path}")
+        # Control the ball to follow the path
+        # Create PID controllers for x and y coordinates
+        pid_x = PIDController(kp=0.1, ki=0.0, kd=0.40)  # Lower kp, higher kd
+        pid_y = PIDController(kp=0.1, ki=0.0, kd=0.40)
 
-#         for target_pos in path:
-#             move_ball_to_position_with_pid(model, data, target_pos, window, scene, context, options, viewport, camera, pid_x, pid_y)
-#     else:
-#         print("No path found")
+        for target_pos in path:
+            move_ball_to_position_with_pid(model, data, target_pos, window, scene, context, options, viewport, camera, pid_x, pid_y)
+    else:
+        print("No path found")
 
-#     # Close the window and terminate glfw
-#     glfw.terminate()
+    # Close the window and terminate glfw
+    glfw.terminate()
