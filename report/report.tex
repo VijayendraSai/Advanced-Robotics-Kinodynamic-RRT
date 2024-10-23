@@ -28,17 +28,23 @@ In robotics, autonomous path planning and control are crucial aspects of robot n
 \subsection{Objectives}
 The main challenge is efficiently generating a collision-free path from a start point to a goal point in a cluttered environment and ensure the ball follows this path with minimal deviation. We took the following steps to achieve the objective.
 \begin{itemize}
-    \item Implement a Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\)) plan a path in a 3D environment with a rectangular obstacle.
+    \item The first step was creating a basic path finding technique in a 3D environment with a rectangular obstacle and using Dijkstra for path selection. The control were set values with a ramp up and slow down for controlling the velocity. 
 
     \begin{figure}[h!]
       \centering
-      \includegraphics[width=0.5\textwidth]{/images/trapezoidal.png}
-      \caption{This is the caption of the image.}
+      \includegraphics[width=0.5\textwidth]{./images/trapezoidal.png}
+      \caption{Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\))}
       \label{fig:sample_image}
     \end{figure}
 
-    
-    \item Implement a Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\)) plan a path in a 3D environment with a rectangular obstacle.
+    \item Next we upgraded the Trapezoidal decomposition to a kinodynamic RRT for better path finding with a safety margin around the obstacles. 
+
+    \begin{figure}[h!]
+    \centering
+      \includegraphics[width=0.5\textwidth]{./images/path.png}
+      \caption{kinodynamic RRT}
+      \label{fig:sample_image}
+    \end{figure}
     
     \item Use PID controllers to control the robot's movement to follow the planned path.
     \item Simulate the robot's movement in the MuJoCo physics engine and visualize the results.
