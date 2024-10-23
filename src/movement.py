@@ -221,6 +221,7 @@ if __name__ == "__main__":
     model = mujoco.MjModel.from_xml_path("ball_square.xml")
     data = mujoco.MjData(model)
     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
+    seed = 0
     
     # Define outside walls as lines
     outside_walls = [
