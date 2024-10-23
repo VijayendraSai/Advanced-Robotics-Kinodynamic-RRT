@@ -218,6 +218,7 @@ def init_glfw_window(model):
 if __name__ == "__main__":
     
     # Load the MuJoCo model
+    # model = mujoco.MjModel.from_xml_path("ball_square.xml")
     model = mujoco.MjModel.from_xml_path("ball_square.xml")
     data = mujoco.MjData(model)
     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
