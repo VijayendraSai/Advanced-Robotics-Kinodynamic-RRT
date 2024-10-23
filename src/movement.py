@@ -214,8 +214,13 @@ def init_glfw_window(model):
     # Return the window, camera, scene, context, options, and viewport for rendering
     return window, camera, scene, context, options, viewport
 
-############################################################################################################################################################
 
+
+
+
+
+####################################################################################################################################################################
+# Add this function to visualize the tree growth
 def visualize_tree(T, walls, goal_area, outside_walls):
     plt.figure(figsize=(8, 6))
     
@@ -269,15 +274,16 @@ def evaluate_time_limits():
     time_limits = [5, 10, 20, 30]
     results = {}
     
+    # Get environment parameters
+    start_pos, goal_pos, walls, goal_area, outside_walls = setup_environment()
+    
     for max_time in time_limits:
         print(f"\nTesting with Tmax = {max_time} seconds")
-        success_rate, avg_time = run_trials(30, max_time)
+        success_rate, avg_time = run_trials(30, max_time, start_pos, goal_pos, walls)
         results[max_time] = {
             'success_rate': success_rate,
             'avg_time': avg_time
         }
-        print(f"Success Rate: {success_rate:.2f}%")
-        print(f"Average Time: {avg_time:.2f}s")
     
     return results
 
@@ -338,14 +344,17 @@ if __name__ == "__main__":
     # Close any remaining windows
     plt.close('all')
 
-############################################################################################################################################################
+
+####################################################################################################################################################################
+
+
 
 # Using the RRT in the main function
 # if __name__ == "__main__":
     
 #     # Load the MuJoCo model
 #     # model = mujoco.MjModel.from_xml_path("ball_square.xml")
-#     model = mujoco.MjModel.from_xml_path("/Users/shubham/Documents/Rutgers University/MS in Data Science/Fall 2024/Advanced Robotics/Project/Advanced_Robotics/src/ball_square.xml")
+#     model = mujoco.MjModel.from_xml_path("ball_square.xml")
 #     data = mujoco.MjData(model)
 #     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
     
