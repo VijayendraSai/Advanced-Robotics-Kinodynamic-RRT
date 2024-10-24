@@ -37,7 +37,9 @@ class Node:
         self.parent = parent
         self.control = None
 
-def kinodynamic_rrt(start_pos, goal_pos, walls, N=100000):
+def kinodynamic_rrt(start_pos, goal_pos, walls, seed=0, N=100000):
+    random.seed(seed)
+    np.random.seed(seed)
     
     T = [Node(start_pos)]  # Initialize the tree with the start node
     accepted_distance = 0.1
@@ -48,15 +50,14 @@ def kinodynamic_rrt(start_pos, goal_pos, walls, N=100000):
         ue = choose_control(xnear.position, xrand)  # Choose control input
         xe = simulate(xnear.position, ue)  # Simulate the new position
         
-        # Updated to pass walls parameter to is_collision_free
         if is_collision_free(xe, walls):
             new_node = Node(xe, parent=xnear)
             new_node.control = ue
             T.append(new_node)    
-            if np.linalg.norm(np.array(goal_pos) - np.array(xe)) < accepted_distance:  # Check if xe is close to goal
-                return construct_path(new_node)
+            if np.linalg.norm(np.array(goal_pos) - np.array(xe)) < accepted_distance:
+                return construct_path(new_node), T
     
-    return None  # Return None if no path is found
+    return None, T  # Return None if no path is found, along with the tree
 
 def sample_random_position():
     return np.array([random.uniform(-0.5, 1.5), random.uniform(-0.4, 0.4)])  # Adjust to map bounds
@@ -214,6 +215,49 @@ def init_glfw_window(model):
     # Return the window, camera, scene, context, options, and viewport for rendering
     return window, camera, scene, context, options, viewport
 
+def visualize_tree(T, goal_pos, walls=None, goal_area=None, outside_walls=None):
+    plt.figure(figsize=(8, 6))
+
+    # Plot walls as boxes
+    if walls:
+        for wall, coordinates in walls.items():
+            wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
+            plt.gca().add_patch(wall_polygon)
+
+    # Plot outside walls as lines
+    if outside_walls:
+        for wall in outside_walls:
+            plt.plot([wall[0][0], wall[1][0]], [wall[0][1], wall[1][1]], 'k-', lw=2)
+
+    # Plot the goal area as a box
+    if goal_area:
+        goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
+        plt.gca().add_patch(goal_polygon)
+
+    # Plot the nodes and edges of the tree
+    for node in T:
+        if node.parent:
+            plt.plot([node.position[0], node.parent.position[0]], [node.position[1], node.parent.position[1]], 'b-', alpha=0.5)
+        plt.plot(node.position[0], node.position[1], 'bo', markersize=3)
+
+    # Plot the start and goal positions
+    start_pos = T[0].position
+    plt.plot(start_pos[0], start_pos[1], 'go', label='Start', markersize=10)
+    plt.plot(goal_pos[0], goal_pos[1], 'ro', label='Goal', markersize=10)
+
+    # Set limits
+    plt.xlim(-0.6, 1.6)
+    plt.ylim(-0.5, 0.5)
+
+    # Add labels and title
+    plt.xlabel("X Position")
+    plt.ylabel("Y Position")
+    plt.title("Kinodynamic-RRT Tree")
+    plt.legend()
+
+    plt.grid(True)
+    plt.show()
+
 # Using the RRT in the main function
 if __name__ == "__main__":
     
@@ -222,7 +266,6 @@ if __name__ == "__main__":
     model = mujoco.MjModel.from_xml_path("ball_square.xml")
     data = mujoco.MjData(model)
     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
-    seed = 0
     
     # Define outside walls as lines
     outside_walls = [
@@ -239,25 +282,32 @@ if __name__ == "__main__":
     start_pos = [0, 0]  # Starting at the origin
     goal_pos = [0.9, 0]  # Goal position based on XML map
 
-    # Perform Kinodynamic-RRT to find a path
-    path = kinodynamic_rrt(start_pos, goal_pos, walls)
-    print(path)
+    # Perform and visualize 5 different trials of the Kinodynamic-RRT
+    for trial in range(5):
+        seed = trial  # Use different seed for each trial
+        path, tree = kinodynamic_rrt(start_pos, goal_pos, walls, seed=seed)
+        print(f"Trial {trial + 1} - Path: {'Found' if path else 'Not Found'}")
+        visualize_tree(tree, goal_pos, walls, goal_area, outside_walls)
 
-    if path:
-        plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
-        # Initialize the window and visualization structures
-        window, camera, scene, context, options, viewport = init_glfw_window(model)
+    # # Perform Kinodynamic-RRT to find a path
+    # path = kinodynamic_rrt(start_pos, goal_pos, walls)
+    # print(path)
+
+    # if path:
+    #     plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+    #     # Initialize the window and visualization structures
+    #     window, camera, scene, context, options, viewport = init_glfw_window(model)
         
-        print(f"Path found: {path}")
-        # Control the ball to follow the path
-        # Create PID controllers for x and y coordinates
-        pid_x = PIDController(kp=0.1, ki=0.0, kd=0.40)  # Lower kp, higher kd
-        pid_y = PIDController(kp=0.1, ki=0.0, kd=0.40)
+    #     print(f"Path found: {path}")
+    #     # Control the ball to follow the path
+    #     # Create PID controllers for x and y coordinates
+    #     pid_x = PIDController(kp=0.1, ki=0.0, kd=0.40)  # Lower kp, higher kd
+    #     pid_y = PIDController(kp=0.1, ki=0.0, kd=0.40)
 
-        for target_pos in path:
-            move_ball_to_position_with_pid(model, data, target_pos, window, scene, context, options, viewport, camera, pid_x, pid_y)
-    else:
-        print("No path found")
+    #     for target_pos in path:
+    #         move_ball_to_position_with_pid(model, data, target_pos, window, scene, context, options, viewport, camera, pid_x, pid_y)
+    # else:
+    #     print("No path found")
 
     # Close the window and terminate glfw
     glfw.terminate()
