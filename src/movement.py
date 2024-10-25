@@ -385,47 +385,67 @@ def planning_time(model, data, path):
             
     return time_elapsed
 
-def visualize_tree(T, goal_pos, walls=None, goal_area=None, outside_walls=None):
-    plt.figure(figsize=(8, 6))
+import matplotlib.pyplot as plt
 
-    # Plot walls as boxes
+def visualize_tree(tree, path, goal_area, walls, outside_walls, start_pos):
+    plt.figure(figsize=(8, 6))
+    # ax = plt.gca()
+    
+    # Plot the middle obstacle
     if walls:
-        for wall, coordinates in walls.items():
+        if isinstance(walls, dict):
+            wall_list = walls.values()
+        elif isinstance(walls, list):
+            wall_list = walls
+        else:
+            raise ValueError("walls must be either a dictionary or a list")
+
+        for coordinates in wall_list:
             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
             plt.gca().add_patch(wall_polygon)
-
-    # Plot outside walls as lines
-    if outside_walls:
-        for wall in outside_walls:
-            plt.plot([wall[0][0], wall[1][0]], [wall[0][1], wall[1][1]], 'k-', lw=2)
 
     # Plot the goal area as a box
     if goal_area:
         goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
         plt.gca().add_patch(goal_polygon)
-
-    # Plot the nodes and edges of the tree
-    for node in T:
+    
+    # Plot outside walls as lines
+    if outside_walls:
+        for wall in outside_walls:
+            plt.plot([wall[0][0], wall[1][0]], [wall[0][1], wall[1][1]], 'k-', lw=2)
+    
+    # Plot the tree nodes and edges
+    for node in tree:
         if node.parent:
-            plt.plot([node.position[0], node.parent.position[0]], [node.position[1], node.parent.position[1]], 'b-', alpha=0.5)
-        plt.plot(node.position[0], node.position[1], 'bo', markersize=3)
+            # Draw the edge from parent to node
+            plt.plot([node.position[0], node.parent.position[0]],
+                    [node.position[1], node.parent.position[1]], 'b-', alpha=0.5)  # Blue edges for tree
+        # Draw the node itself
+        plt.plot(node.position[0], node.position[1], 'bo', markersize=2)  # Blue nodes
+    
+    # Plot the start position
+    plt.plot(start_pos[0], start_pos[1], 'ro', label='Start')  # Red dot for start position
+    
+    # Plot the path if one was found
+    if path:
+        # Check if path elements are coordinates (tuples or lists) or Node objects
+        if hasattr(path[0], 'position'):
+            # Path is a list of Node objects
+            path_x = [node.position[0] for node in path]
+            path_y = [node.position[1] for node in path]
+        else:
+            # Path is a list of coordinates
+            path_x = [coord[0] for coord in path]
+            path_y = [coord[1] for coord in path]
+        
+        plt.plot(path_x, path_y, 'c-', linewidth=2, label='Path')  # Cyan line for the path
 
-    # Plot the start and goal positions
-    start_pos = T[0].position
-    plt.plot(start_pos[0], start_pos[1], 'go', label='Start', markersize=10)
-    plt.plot(goal_pos[0], goal_pos[1], 'ro', label='Goal', markersize=10)
-
-    # Set limits
+    # Configure the plot
+    plt.title("Kinodynamic RRT Tree Visualization")
     plt.xlim(-0.6, 1.6)
     plt.ylim(-0.5, 0.5)
-
-    # Add labels and title
-    plt.xlabel("X Position")
-    plt.ylabel("Y Position")
-    plt.title("Kinodynamic-RRT Tree")
-    plt.legend()
-
-    plt.grid(True)
+    plt.legend(loc='upper right')
+    
     plt.show()
 
 def model_creation(start_pos, goal_area, walls, outside_walls):
@@ -458,9 +478,11 @@ def model_creation(start_pos, goal_area, walls, outside_walls):
 def tree_visualization(start_pos, walls, goal_area, outside_walls):
     for trial in range(5):
         seed = trial
-        path, tree = kinodynamic_rrt(start_pos, walls, seed=seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        path, tree = kinodynamic_rrt(start_pos, goal_area, walls)
         print(f"Trial {trial + 1} - Path: {'Found' if path else 'Not Found'}")
-        visualize_tree(tree, walls, goal_area, outside_walls)
+        visualize_tree(tree, path, goal_area, walls, outside_walls, start_pos)
 
 def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
     success_count = 0
@@ -563,3 +585,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+    
