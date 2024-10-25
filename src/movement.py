@@ -67,9 +67,9 @@ def kinodynamic_rrt(start_pos, goal_area, walls, N=1000):
             # Check if the new position is inside the goal area
             if is_in_goal_area(xe, goal_area):
                 print("Reached goal area")
-                return construct_path(new_node)  # Construct and return the path
+                return construct_path(new_node), T  # Construct and return the path
 
-    return None  # Return None if no path is found
+    return None, T  # Return None if no path is found
 
 def sample_random_position():
     return np.array([random.uniform(-0.5, 1.5), random.uniform(-0.4, 0.4)])  # Adjust to map bounds
@@ -434,7 +434,7 @@ def model_creation(start_pos, goal_area, walls, outside_walls):
     data = mujoco.MjData(model)
     
     # Perform Kinodynamic-RRT to find a path that reaches the goal area
-    path = kinodynamic_rrt(start_pos, goal_area, walls)
+    path, tree = kinodynamic_rrt(start_pos, goal_area, walls)
     
     if path:
         path = smooth_path(path, walls)  # Smooth the path
@@ -474,7 +474,7 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
         data = mujoco.MjData(model)
 
         # Generate a path using kinodynamic RRT
-        path = kinodynamic_rrt(start_pos, goal_area, walls)
+        path, tree = kinodynamic_rrt(start_pos, goal_area, walls)
         
         if path:
             # Smooth the path to avoid obstacles
