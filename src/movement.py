@@ -292,7 +292,7 @@ def move_ball_along_path_with_pid(model, data, path, window, scene, context, opt
 
             time_elapsed += dt
 
-    return
+    return time_elapsed
 
 def init_glfw_window(model):
     if not glfw.init():
@@ -352,6 +352,7 @@ def planning_time(model, data, path):
 
             # If the ball is very close to the end of the segment, move to the next segment
             if distance_to_goal < 0.05:
+                print("Reached node", i + 1)
                 break
 
             # Dynamically calculate the desired speed based on the distance to the next point
@@ -427,21 +428,32 @@ def visualize_tree(T, goal_pos, walls=None, goal_area=None, outside_walls=None):
     plt.grid(True)
     plt.show()
 
-def model_creation(start_pos, goal_area, walls, outside_walls, model, data):
+def model_creation(start_pos, goal_area, walls, outside_walls):
+    # Load the MuJoCo model
+    model = mujoco.MjModel.from_xml_path("ball_square.xml")
+    data = mujoco.MjData(model)
+    
+    # Perform Kinodynamic-RRT to find a path that reaches the goal area
     path = kinodynamic_rrt(start_pos, goal_area, walls)
-   
+    
     if path:
-        path = smooth_path(path, walls)
+        path = smooth_path(path, walls)  # Smooth the path
         plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
         
+        # Initialize the window and visualization structures
         window, camera, scene, context, options, viewport = init_glfw_window(model)
         
-        pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
+        # Create PID controllers for x and y coordinates
+        pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)  # Lower kp, higher kd
         pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
-    
+        
+        # Control the ball to follow the path
         move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y)
     else:
         print("No path found")
+    
+    # Close the window and terminate glfw
+    glfw.terminate()
 
 def tree_visualization(start_pos, walls, goal_area, outside_walls):
     for trial in range(5):
@@ -450,11 +462,64 @@ def tree_visualization(start_pos, walls, goal_area, outside_walls):
         print(f"Trial {trial + 1} - Path: {'Found' if path else 'Not Found'}")
         visualize_tree(tree, walls, goal_area, outside_walls)
 
-def main():
-    # Load the MuJoCo model
-    model = mujoco.MjModel.from_xml_path("ball_square.xml")
-    data = mujoco.MjData(model)
+def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
+    success_count = 0
+    plan_time = -1
     
+    for trial in range(num_trials):
+        print(f"Running trial {trial + 1}/{num_trials}...")
+
+        # Load the MuJoCo model
+        model = mujoco.MjModel.from_xml_path("ball_square.xml")
+        data = mujoco.MjData(model)
+
+        # Generate a path using kinodynamic RRT
+        path = kinodynamic_rrt(start_pos, goal_area, walls)
+        
+        if path:
+            # Smooth the path to avoid obstacles
+            path = smooth_path(path, walls)
+
+            # Plot the path along with boundaries and obstacles
+            plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+            
+            # # Initialize the window and visualization structures
+            # window, camera, scene, context, options, viewport = init_glfw_window(model)
+            
+            # # Create PID controllers for x and y coordinates
+            # pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)  # Lower kp, higher kd
+            # pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
+            
+            # # Control the ball to follow the path
+            #temp = move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y)
+            #print("temp: ", temp)
+
+            # # Close the window and terminate glfw
+            #glfw.terminate()
+
+            # Calculate planning time for the smoothed path
+            plan_time = planning_time(model, data, path)
+            glfw.terminate()
+            #plan_time = temp
+            print(f"Planning time: {plan_time:.2f} seconds")
+
+            # Check if the planning time is within the allowed limit
+            if plan_time <= Tmax:
+                success_count += 1
+                print("Successfully reached the goal area!")
+            else:
+                print("Failed to reach the goal area within the time limit.")
+        else:
+            print("No path found.")
+
+    # Report the success rate after all trials
+    success_rate = (success_count / num_trials) * 100
+    print(f"Success rate over {num_trials} trials: {success_rate:.2f}%")
+
+    
+    # print(f"Planning time: {plan_time:.2f} seconds")
+
+def main():
     # Define the goal area (a rectangular region)
     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
     
@@ -477,94 +542,24 @@ def main():
         print("1. Model Creation")
         print("2. Tree Visualization")
         print("3. Planning Time")
-        print("Q. Quit")        
-        choice = input("Enter your choice: ").strip().lower()       
-        if choice == 'q':
+        print("4. Quit")        
+        choice = int(input("Enter your choice: "))      
+        if choice == 1:
+            model_creation(start_pos, goal_area, walls, outside_walls)
+        elif choice == 2:
+            tree_visualization(start_pos, walls, goal_area, outside_walls)
+            # Close the window and terminate glfw
+            glfw.terminate()
+        elif choice == 3:
+            num_trials = 10
+            print("start_pos: ", start_pos)
+            Tmax = int(input("Enter Tmax: "))
+            run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
+        elif choice == 4:
             print("Exiting the program. Goodbye!")
             break
-        elif choice == '1':
-            model_creation(start_pos, goal_area, walls, outside_walls, model, data)
-        elif choice == '2':
-            tree_visualization(start_pos, walls, goal_area, outside_walls)
-        elif choice == '3':
-            path = kinodynamic_rrt(start_pos, goal_area, walls)
-            if path:
-                path = smooth_path(path, walls)
-                plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
-                
-                # window, camera, scene, context, options, viewport = init_glfw_window(model)
-                
-                # pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
-                # pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
-                time = planning_time(model, data, path)
-                print(f"Planning time: {time} seconds")
-            else:
-                print("No path found")
         else:
             print("Invalid option. Please try again.")
 
 if __name__ == "__main__":
     main()
-    # Load the MuJoCo model
-    # model = mujoco.MjModel.from_xml_path("ball_square.xml")
-    # data = mujoco.MjData(model)
-    
-    # # Define the goal area (a rectangular region)
-    # goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
-    
-    # # Define outside walls as lines
-    # outside_walls = [
-    #     [[-0.5, -0.4], [-0.5, 0.4]],
-    #     [[1.5, -0.4], [1.5, 0.4]],
-    #     [[-0.5, 0.4], [1.5, 0.4]],
-    #     [[-0.5, -0.4], [1.5, -0.4]]]
-
-    # # Define the middle obstacle
-    # walls = {
-    #     "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]}
-
-    # # Define the start position
-    # start_pos = [0, 0]  # Starting at the origin
-    
-    # while True:
-    #     print("\nMenu:")
-    #     print("1. Model Creation")
-    #     print("2. Tree Visualization")
-    #     print("3. Planning Time")
-    #     print("Q. Quit")        
-    #     choice = input("Enter your choice: ").strip().lower()       
-    #     if choice == 'q':
-    #         print("Exiting the program. Goodbye!")
-    #         break
-    #     elif choice == '1':
-    #         model_creation(start_pos, goal_area, walls, outside_walls, model, data)
-    #     elif choice == '2':
-    #         tree_visualization(start_pos, goal_pos, walls, goal_area, outside_walls)
-    #     elif choice == '3':
-    #         time = planning_time(model, data, path)
-    #         print(f"Planning time: {time} seconds")
-    #     else:
-    #        print("Invalid option. Please try again.")
-
-    # model_creation(start_pos, goal_area, walls, outside_walls)
-    # # Perform Kinodynamic-RRT to find a path that reaches the goal area
-    # path = kinodynamic_rrt(start_pos, goal_area, walls)
-    
-    # if path:
-    #     path = smooth_path(path, walls)  # Smooth the path
-    #     plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
-        
-    #     # Initialize the window and visualization structures
-    #     window, camera, scene, context, options, viewport = init_glfw_window(model)
-        
-    #     # Create PID controllers for x and y coordinates
-    #     pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)  # Lower kp, higher kd
-    #     pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
-        
-    #     # Control the ball to follow the path
-    #     move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y)
-    # else:
-    #     print("No path found")
-
-    # Close the window and terminate glfw
-    # glfw.terminate()
