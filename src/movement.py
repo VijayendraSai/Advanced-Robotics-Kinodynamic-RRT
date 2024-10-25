@@ -167,10 +167,53 @@ def smooth_path(path, walls, max_attempts=50):
     
     return smoothed_path
 
+# def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=None, outside_walls=None):
+    
+#     # Plot 2D walls as boxes if provided
+#     plt.figure(figsize=(8, 6))
+#     if walls:
+#         for wall, coordinates in walls.items():
+#             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
+#             plt.gca().add_patch(wall_polygon)
+
+#     # Plot outside walls as lines if provided
+#     if outside_walls:
+#         for wall in outside_walls:
+#             plt.plot([wall[0][0], wall[1][0]], [wall[0][1], wall[1][1]], 'k-', lw=2)
+
+#     # Plot the goal area as a 2D box if provided
+#     if goal_area:
+#         goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
+#         plt.gca().add_patch(goal_polygon)
+
+#     # Plot the path
+#     path = np.array(path)  # Ensure path is a numpy array
+#     plt.plot(path[:, 0], path[:, 1], 'bo-', label='Path')
+
+#     # Plot the start and goal positions
+#     plt.plot(path[0, 0], path[0, 1], 'go', label='Start', markersize=10)
+#     plt.plot(path[-1, 0], path[-1, 1], 'ro', label='Goal', markersize=10)
+
+#     # Set limits
+#     plt.xlim(-0.6, 1.6)
+#     plt.ylim(-0.5, 0.5)
+
+#     # Add labels and title
+#     plt.xlabel("X Position")
+#     plt.ylabel("Y Position")
+#     plt.title("Kinodynamic RRT Path with Map Boundaries and Obstacles")
+#     plt.legend()
+
+#     # Show the plot
+#     plt.grid(True)
+#     plt.show()
+    
+#     return
+
 def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=None, outside_walls=None):
+    plt.figure(figsize=(8, 6))
     
     # Plot 2D walls as boxes if provided
-    plt.figure(figsize=(8, 6))
     if walls:
         for wall, coordinates in walls.items():
             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
@@ -186,13 +229,13 @@ def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=No
         goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
         plt.gca().add_patch(goal_polygon)
 
-    # Plot the path
-    path = np.array(path)  # Ensure path is a numpy array
-    plt.plot(path[:, 0], path[:, 1], 'bo-', label='Path')
+    # Convert path to numpy array and plot
+    path_array = np.array([(p[0], p[1]) for p in path])
+    plt.plot(path_array[:, 0], path_array[:, 1], 'bo-', label='Path')
 
     # Plot the start and goal positions
-    plt.plot(path[0, 0], path[0, 1], 'go', label='Start', markersize=10)
-    plt.plot(path[-1, 0], path[-1, 1], 'ro', label='Goal', markersize=10)
+    plt.plot(path_array[0, 0], path_array[0, 1], 'go', label='Start', markersize=10)
+    plt.plot(path_array[-1, 0], path_array[-1, 1], 'ro', label='Goal', markersize=10)
 
     # Set limits
     plt.xlim(-0.6, 1.6)
@@ -470,6 +513,23 @@ def planning_time(model, data, path):
 #     else:
 #         print("No path found")
 
+def model_creation(start_pos, goal_area, walls, outside_walls, model, data):
+    # Unpack the returned tuple from kinodynamic_rrt
+    path_result, tree = kinodynamic_rrt(start_pos, goal_area, walls)
+   
+    if path_result:
+        path = smooth_path(path_result, walls)
+        plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+        
+        window, camera, scene, context, options, viewport = init_glfw_window(model)
+        
+        pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
+        pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
+    
+        move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y)
+    else:
+        print("No path found")
+
 def visualize_tree(T, goal_pos, walls, goal_area=None, outside_walls=None):
     plt.figure(figsize=(8, 6))
 
@@ -541,9 +601,63 @@ def tree_visualization(start_pos, goal_area, walls, outside_walls):
         
         visualize_tree(T, goal_area[0], wall_list, goal_area, outside_walls)
 
+# def main():
+#     # Load the MuJoCo model
+#     # model = mujoco.MjModel.from_xml_path("ball_square.xml")
+#     model = mujoco.MjModel.from_xml_path("/Users/shubham/Documents/Rutgers University/MS in Data Science/Fall 2024/Advanced Robotics/Project/Advanced_Robotics/src/ball_square.xml")
+#     data = mujoco.MjData(model)
+    
+#     # Define the goal area (a rectangular region)
+#     goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
+    
+#     # Define outside walls as lines
+#     outside_walls = [
+#         [[-0.5, -0.4], [-0.5, 0.4]],
+#         [[1.5, -0.4], [1.5, 0.4]],
+#         [[-0.5, 0.4], [1.5, 0.4]],
+#         [[-0.5, -0.4], [1.5, -0.4]]]
+
+#     # Define the middle obstacle
+#     walls = {
+#         "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]
+#         }
+
+#     # Define the start position
+#     start_pos = [0, 0]  # Starting at the origin
+    
+#     while True:
+#         print("\nMenu:")
+#         print("1. Model Creation")
+#         print("2. Tree Visualization")
+#         print("3. Planning Time")
+#         print("Q. Quit")        
+#         choice = input("Enter your choice: ").strip().lower()       
+#         if choice == 'q':
+#             print("Exiting the program. Goodbye!")
+#             break
+#         elif choice == '1':
+#             model_creation(start_pos, goal_area, walls, outside_walls, model, data)
+#         elif choice == '2':
+#             tree_visualization(start_pos, goal_area, walls, outside_walls)
+#         elif choice == '3':
+#             path = kinodynamic_rrt(start_pos, goal_area, walls)
+#             if path:
+#                 path = smooth_path(path, walls)
+#                 plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+                
+#                 # window, camera, scene, context, options, viewport = init_glfw_window(model)
+                
+#                 # pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
+#                 # pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
+#                 time = planning_time(model, data, path)
+#                 print(f"Planning time: {time} seconds")
+#             else:
+#                 print("No path found")
+#         else:
+#             print("Invalid option. Please try again.")
+
 def main():
     # Load the MuJoCo model
-    # model = mujoco.MjModel.from_xml_path("ball_square.xml")
     model = mujoco.MjModel.from_xml_path("/Users/shubham/Documents/Rutgers University/MS in Data Science/Fall 2024/Advanced Robotics/Project/Advanced_Robotics/src/ball_square.xml")
     data = mujoco.MjData(model)
     
@@ -560,7 +674,7 @@ def main():
     # Define the middle obstacle
     walls = {
         "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]
-        }
+    }
 
     # Define the start position
     start_pos = [0, 0]  # Starting at the origin
@@ -572,6 +686,7 @@ def main():
         print("3. Planning Time")
         print("Q. Quit")        
         choice = input("Enter your choice: ").strip().lower()       
+        
         if choice == 'q':
             print("Exiting the program. Goodbye!")
             break
@@ -580,21 +695,17 @@ def main():
         elif choice == '2':
             tree_visualization(start_pos, goal_area, walls, outside_walls)
         elif choice == '3':
-            path = kinodynamic_rrt(start_pos, goal_area, walls)
-            if path:
-                path = smooth_path(path, walls)
+            path_result, tree = kinodynamic_rrt(start_pos, goal_area, walls)
+            if path_result:
+                path = smooth_path(path_result, walls)
                 plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
-                
-                # window, camera, scene, context, options, viewport = init_glfw_window(model)
-                
-                # pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
-                # pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
                 time = planning_time(model, data, path)
                 print(f"Planning time: {time} seconds")
             else:
                 print("No path found")
         else:
             print("Invalid option. Please try again.")
+
 
 if __name__ == "__main__":
     main()
