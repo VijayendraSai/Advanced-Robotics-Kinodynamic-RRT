@@ -11,13 +11,11 @@
 \title{Kinodynamic RRT with PID Control for Obstacle Avoidance in a MuJoCo Environment}
 \author{Mark Doughten, Vijayendra Sai Chennareddy, Shubham Patil}
 \date{\today}
-
 \begin{document}
-
 \maketitle
 
 \section{Introduction}
-In robotics, autonomous path planning and control are crucial aspects of robot navigation, particularly in environments with obstacles. The objective of this project is to implement a hybrid approach that combines kinodynamic Rapidly-exploring Random Tree (RRT) for path planning and Proportional-Integral-Derivative (PID) controllers for executing the motion along the planned path. This work is demonstrated using a ball in a MuJoCo simulation environment, where the ball navigates through an environment containing walls and boundaries. The goal is to move the ball from a starting position to a goal position while avoiding obstacles using the kinodynamic RRT algorithm and accurately controlling the movement with PID.
+In robotics, autonomous path planning and control are crucial aspects of robot navigation, particularly in environments with obstacles. The objective of this project is to implement a hybrid approach that combines kinodynamic rapidly-exploring random Tree (RRT) for path planning and proportional-integral-derivative (PID) controllers for executing the motion along the planned path. This work is demonstrated using a ball in a MuJoCo simulation environment, where the ball navigates through an environment containing walls and boundaries. The goal is to move the ball from a starting position to a goal position while avoiding obstacles using the kinodynamic RRT algorithm and accurately controlling the movement with PID.
 
 \subsection{Objectives}
 The main challenge is efficiently generating a collision-free path from a start point to a goal point in a cluttered environment and ensuring the ball follows this path with minimal deviation. We undertook the following steps to achieve this objective:
@@ -27,7 +25,7 @@ The main challenge is efficiently generating a collision-free path from a start 
     \begin{figure}[h!]
         \centering
         \includegraphics[width=0.5\textwidth]{./images/trapezoidal.png}
-        \caption{Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\))}
+        \caption{Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\))\cite{mobile_robotics}}
         \label{fig:trapezoidal}
     \end{figure}
     \item Enhancing pathfinding with kinodynamic RRT, incorporating a safety margin around obstacles.
@@ -37,7 +35,7 @@ The main challenge is efficiently generating a collision-free path from a start 
         \caption{Kinodynamic RRT}
         \label{fig:kinodynamic}
     \end{figure}
-    \item Replacing basic controls with a Proportional-Integral-Derivative (PID) controller to follow the planned path.
+    \item Replacing basic controls with a PID controller to follow the planned path.
     \item Simulating and visualizing the robot’s movement within the MuJoCo physics engine.
 \end{itemize}
 
@@ -64,7 +62,7 @@ This setup ensures the presence of both static and dynamic constraints, making p
 \section{Path Planning}
 
 \subsection{Algorithm Overview}
-Rapidly-exploring Random Trees (RRT) are widely used for motion planning in high-dimensional spaces. In this project, we implement a kinodynamic variant of RRT. Unlike standard RRT, the kinodynamic RRT accounts for the robot’s dynamics while generating the tree, ensuring that the planned path can be followed realistically by the robot. This approach helps avoid sharp or unrealistic turns that the robot may not be able to follow.
+RRT\cite{planning_dynamics} are widely used for motion planning in high-dimensional spaces. In this project, we implement a kinodynamic variant of RRT. Unlike standard RRT, the kinodynamic RRT accounts for the robot’s dynamics while generating the tree, ensuring that the planned path can be followed realistically by the robot. This approach helps avoid sharp or unrealistic turns that the robot may not be able to follow.
 
 The algorithm grows a tree from the start position by:
 \begin{enumerate}
@@ -101,17 +99,29 @@ Once the algorithm successfully identifies a path to the goal, the tree is trave
 
 When a path is established between two nodes, the function \texttt{line\_goes\_through\_goal} checks if the path intersects with the goal area by interpolating and sampling points along the path. If an intersection is detected, the endpoint is adjusted to the coordinates (0.9, y) based on the last generated point. This modification effectively minimizes the distance required to reach the goal, as evidenced by the time trial paths.
 
-\subsection{Path Smoothing}
+\subsection{Smoothing}
 After selecting the path within the Rapidly-exploring Random Tree, post-processing occurs using the \texttt{smooth\_path} function. This function randomly selects points in the graph to determine if they can be directly connected while eliminating intermediate points. As a result, the path is reduced to a series of critical waypoints, simplifying navigation. This reduction allows the control implementation to restart upon reaching each subsequent point, providing the controller with adequate time to complete the feedback loop before moving on to the next waypoint.
 
 \section{Navigation}
 
-\subsection{PID Controller Overview}
-Proportional-Integral-Derivative (PID) controllers are commonly used in control systems to achieve stable and accurate control. In this project, two PID controllers are implemented: one for controlling the movement of the ball in the \(x\)-direction and the other for the \(y\)-direction. Each controller computes the control input based on the error between the current and target positions, aiming to reduce this error over time.
+\subsection{Controller}
+PID controllers are commonly used in control systems to achieve stable and accurate control. In this project, two PID controllers are implemented: one for controlling the movement of the ball in the \(x\)-direction and the other for the \(y\)-direction. Each controller computes the control input based on the error between the current and target positions, aiming to reduce this error over time.
 
 The function \texttt{move\_ball\_to\_position\_with\_pid} implements the control loop, where the ball’s current position is compared to the target position from the planned path. The PID controllers compute the necessary force to move the ball toward the target, and the control inputs are applied in each iteration of the simulation.
 
-\subsection{Adjusting PID Gains}
+\begin{equation}
+u(t) = K_p e(t) + K_i \int_0^t e(\tau) \, d\tau + K_d \frac{d}{dt} e(t)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item \( K_p \): Proportional gain,
+    \item \( K_i \): Integral gain,
+    \item \( K_d \): Derivative gain,
+    \item \( e(t) = r(t) - y(t) \): Error at time \( t \).
+\end{itemize}
+
+\subsection{Parameters}
 The gains for the PID controllers were manually tuned to achieve smooth movement without overshooting. This tuning required observing the patterns in the model simulation and adjusting accordingly; no penalty for previous errors was applied. The proportional (\texttt{kp}), integral (\texttt{ki}), and derivative (\texttt{kd}) gains were set as follows:
 \begin{itemize}
     \item \textbf{Proportional Gain (\texttt{kp}):} 0.58 — provides a basic correction based on the current error.
@@ -121,7 +131,7 @@ The gains for the PID controllers were manually tuned to achieve smooth movement
 
 The higher proportional gain results in more aggressive error correction, which was necessary to achieve trials below a certain time threshold. Once the new point is set, the ball minimizes the error by updating its velocity. The \(x\)-direction and \(y\)-direction have the same controller configuration for symmetry. The same controllers are used to simulate the motion planning between two nodes in the Rapidly-exploring Random Tree.
 
-\subsection{Path Following}
+\subsection{Pathfinder}
 The PID controllers move the ball sequentially through each point in the planned path. Movement is clamped to prevent overshooting, and the simulation continues until the ball reaches the goal position with minimal error (set to 0.075 in this case). 
 
 \begin{figure}[h!]
@@ -133,19 +143,112 @@ The PID controllers move the ball sequentially through each point in the planned
  
 The deviation is calculated using the \texttt{calculate\_deviation} function. This feedback is important for determining how far the ball is from the trajectory, what adjustments to the controllers are necessary, and ensuring that the ball will not collide with obstacles between two points.
 
-\subsection{Control Challenges}
-Several challenges arise during the control process, including handling sharp turns in the path and adjusting the control parameters to prevent oscillations. The derivative gain plays a crucial role in damping the response and ensuring smooth transitions between points.
+\subsection{Adjustments}
+
+Several challenges arise during the control process, including handling sharp turns in the path and adjusting the control parameters to prevent oscillations. The derivative gain plays a crucial role in damping the response and ensuring smooth transitions between points. The best method for finding the right parameter was using a process that required increased the $K_p$ value until oscillation was guaranteed. The Ziegler–Nichols tuning method \cite{{ziegler-nichols-wiki}} is a heuristic approach to tuning a PID controller, developed by John G. Ziegler and Nathaniel B. Nichols. It is used to determine the proportional, integral, and derivative gains \( K_p \), \( K_i \), and \( K_d \) for a PID controller.
+
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \textbf{Controller Type} & \( K_p \) & \( K_i \) & \( K_d \) \\
+        \hline
+        P & \( 0.5 K_u \) & - & - \\
+        PI & \( 0.45 K_u \) & \( \frac{K_p}{0.83 T_u} \) & - \\
+        PD & \( 0.8 K_u \) & - & \( K_p \cdot 0.125 T_u \) \\
+        PID & \( 0.6 K_u \) & \( \frac{K_p}{0.5 T_u} \) & \( K_p \cdot 0.125 T_u \) \\
+        \hline
+    \end{tabular}
+    \caption{Ziegler–Nichols Tuning Parameters}
+    \label{tab:zn_parameters}
+\end{table}
 
 \subsection{Path Visualization and Obstacle Mapping}
-The function \texttt{visualize\_final\_tree} generates a graphical representation of the kinodynamic RRT, illustrating the exploration process and highlighting the path to the goal.
-
+The function \texttt{visualize\_final\_tree} generates a graphical representation of the kinodynamic RRT, illustrating the exploration process and highlighting the path to the goal. The easiest approach to path visualization was created a top down $2D$ view for visualizing the path on the map. This perceptive aided the team in debugging how the path was getting created, the optimal path, and dangers in specific areas. As an example, the $2d$ view showed that the ball was getting too close to the front of the obstacle. Based on the limited controls and the time constraints, the ball would get too close and not know how to get out of the situation. The new information allowed use to implement a buffer around the object preventing the path from entering that area. 
 
 \subsection{Dynamic Speed Adjustment for Smooth Deceleration}
 The function \texttt{update\_speed} adjusts the robot's speed based on its distance from the goal, allowing for controlled deceleration to avoid overshooting.
 
 \section{Results}
 
-\subsection{Visualize trees for 5 different trials}
+There were three main objectives in this experiment. The first one was getting the environment running, the second generating a path using kinodynamic RRT, and the third was getting the ball to the goal using controllers. The team demonstrated success on all three objectives. 
+
+\subsection{Environment}
+
+The model creation and execution worked well in the MuJoCo environment and allowed the team to witness the controller behavior prior to using in the kinodynamic RRT search. The simulated search for the path should reflect accuracy how the ball would actually move in the space to the way points and maintain control. It prevented the team was implement controller that behave erratically and would not lead to generating a complete path.
+
+\subsection{Visualize Trees}
+
+At the end of the report, a complete tree generated using kinodynamic RRT used as a path to the goal. The trees show the effectiveness of using kinodynamic RRT and the success rate for finding the goal despite the different seed. In trails 2, 4, and 5, the tree is not expansive showing the quickness for finding a node in the goal. An area worth exploring in the future is implement a suite of controllers and randomly selecting them for a better representation. In this experiment, the team is using one controller for all the path finding. 
+
+\subsection{Time Trials}
+
+The \texttt{run\_planning\_trial} function runs multiple trials and evaluates the success rate of the kinodynamic RRT in reaching the goal area in the a defined time limit. The team was successful in getting a path each trail and under the time contraints with a $100\%$ accuracy. The quickest shows the effectiveness for using a PID controller for path finding and simulating the ball movements to better represent the actual movement. Similar to the drone movement in the University of Utah technical report \cite{uucs_12_002}, kinodynamic RRT is a reasonable approach for solving this problem. 
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{./images/success.png}
+    \caption{Success Rates}
+    \label{fig:Succees Rates}
+\end{figure}
+
+\section{Conclusion}
+This project successfully integrated kinodynamic RRT for path planning and PID control for path execution in a simulated 3D environment. By leveraging these techniques, ball can navigate a complex environment with obstacles and boundaries while accurately following the planned path to the goal.
+
+\begin{thebibliography}{}
+\raggedright
+
+\bibitem{mobile_robotics}
+Burgard, Wolfram, et al. Introduction to Mobile Robotics. Slides by Kai Arras, last updated July 2011, with material from S. LaValle, J.C. Latombe, H. Choset, and W. Burgard. \href{http://ais.informatik.uni-freiburg.de/news/index_en.php}{http://ais.informatik.uni-freiburg.de/news/index\_en.php}
+
+\bibitem{planning_dynamics}
+Planning with Dynamics and Uncertainty. \href{https://motion.cs.illinois.edu/RoboticSystems/PlanningWithDynamicsAndUncertainty.html}
+{https://motion.cs.illinois.edu/RoboticSystems/PlanningWithDynamicsAndUncertainty.html}
+
+\bibitem{uucs_12_002}
+University of Utah, School of Computing. Technical Report UUCS-12-002, 2012. \href{https://www-old.cs.utah.edu/docs/techreports/2012/pdf/UUCS-12-002.pdf}{https://www-old.cs.utah.edu/docs/techreports/2012/pdf/UUCS-12-002.pdf}
+
+\bibitem{ziegler-nichols-wiki}
+Wikipedia contributors, "Ziegler–Nichols method," \textit{Wikipedia},
+\url{https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method}, accessed 26-October-2024.
+
+\end{thebibliography}
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/5.png}
+        \caption{Tmax = 5}
+        \label{fig:5.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/10.png}
+        \caption{Tmax = 10}
+        \label{fig:10.png}
+    \end{subfigure}
+    
+    \vspace{0.5cm} % Adds some vertical space between rows
+
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/20.png}
+        \caption{Tmax = 20}
+        \label{fig:20.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/30.png}
+        \caption{Tmax = 30}
+        \label{fig:30.png}
+    \end{subfigure}
+
+    \caption{Visualization of path exploration}
+    \label{fig:Time Trails}
+\end{figure}
 
 \begin{figure}[h!]
     \centering
@@ -190,69 +293,4 @@ The function \texttt{update\_speed} adjusts the robot's speed based on its dista
     \label{fig:trials}
 \end{figure}
 
-\subsection{Success Rates for Time Trial}
-
-The \texttt{run\_trial} function conducts multiple trials to evaluate the success rate of the PID-controlled robot in reaching the target area within a defined time limit
-
-\subsubsection{Path Exploration}
-\begin{figure}[h!]
-    \centering
-    \begin{subfigure}{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{./images/5.png}
-        \caption{Tmax = 5}
-        \label{fig:5.png}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{./images/10.png}
-        \caption{Tmax = 10}
-        \label{fig:10.png}
-    \end{subfigure}
-    
-    \vspace{0.5cm} % Adds some vertical space between rows
-
-    \begin{subfigure}{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{./images/20.png}
-        \caption{Tmax = 20}
-        \label{fig:20.png}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{./images/30.png}
-        \caption{Tmax = 30}
-        \label{fig:30.png}
-    \end{subfigure}
-
-    \caption{Visualization of path exploration}
-    \label{fig:Time Trails}
-\end{figure}
-
-
-\subsubsection{Success Rates}
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.5\textwidth]{./images/success.png}
-    \caption{Succees Rates}
-    \label{fig:Succees Rates}
-\end{figure}
-
-\section{Conclusion}
-This project successfully integrated kinodynamic RRT for path planning and PID control for path execution in a simulated 3D environment. By leveraging these techniques, ball can navigate a complex environment with obstacles and boundaries while accurately following the planned path to the goal.
-
-\begin{thebibliography}{}
-\raggedright
-
-\bibitem{planning_dynamics}
-Planning with Dynamics and Uncertainty. \href{https://motion.cs.illinois.edu/RoboticSystems/PlanningWithDynamicsAndUncertainty.html}
-{https://motion.cs.illinois.edu/RoboticSystems/PlanningWithDynamicsAndUncertainty.html}
-
-\bibitem{mobile_robotics}
-Burgard, Wolfram, et al. Introduction to Mobile Robotics. Slides by Kai Arras, last updated July 2011, with material from S. LaValle, J.C. Latombe, H. Choset, and W. Burgard. \href{http://ais.informatik.uni-freiburg.de/news/index_en.php}{http://ais.informatik.uni-freiburg.de/news/index\_en.php}
-
-
-\end{thebibliography}
 \end{document}
