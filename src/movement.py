@@ -5,6 +5,7 @@ import random
 import matplotlib
 import matplotlib.pyplot as plt
 import math
+import time
 
 class PIDController:
     def __init__(self, kp, ki, kd, setpoint=0):
@@ -538,7 +539,7 @@ def generate_random_seed():
     seed = random.randint(0, 2**32 - 1)
     return seed
 
-def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
+def run_execution_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
     
     success_count = 0
     plan_time = -1
@@ -585,6 +586,43 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
     
     return
 
+def run_planning_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
+    
+    success_count = 0
+    plan_time = -1
+    paths = []
+    
+    for trial in range(num_trials):
+        
+        print(f"Running trial {trial + 1}/{num_trials}...")
+        seed = generate_random_seed()
+        
+        # load the MuJoCo model
+        pid_x = PIDController(kp=.58, ki=0.0, kd=0.5)
+        pid_y = PIDController(kp=.58, ki=0.0, kd=0.5)
+
+        # generate a path using kinodynamic RR
+        start_time = time.time()
+        while time.time() - start_time < Tmax:
+            path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls, tolerance=0.15, N=1000, plot=False, logging=False)
+            if path:
+                break
+
+        if path:
+            print(f'Trial {trial + 1}: Path found.') 
+            success_count += 1
+            path = smooth_path(path, walls, outside_walls)
+            paths.append(path)
+        else:
+            print(f'Trial {trial + 1}: Path not found.')
+
+    # report the success rate
+    success_rate = (success_count / num_trials) * 100
+    print(f"Success rate over {num_trials} trials: {success_rate:.2f}%")
+    plot_path_with_boundaries_and_mixed_obstacles(paths, walls, goal_area, outside_walls)
+    
+    return
+
 def main():
     
     # define the goal area, walls, and the starting position
@@ -620,8 +658,7 @@ def main():
         # run all the trails in a loop with changing time
         for Tmax in [30, 20, 10, 5]:
             print(f'Starting {num_trials} trails for {Tmax} seconds')
-            run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
-        exit()
+            run_planning_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
     elif choice == 4:
         print("Exiting the program. Goodbye!")
     else:
