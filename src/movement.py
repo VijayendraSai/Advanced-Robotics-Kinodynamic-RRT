@@ -91,6 +91,7 @@ def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=Non
     return path_found, T  # Return None if no path is found
 
 def line_goes_through_goal(point1, point2, goal_area, num_samples=10):
+    
     # Sample points along the line from point1 to point2
     for t in range(1, num_samples):
         # Interpolating points between point1 and point2
@@ -105,6 +106,7 @@ def line_goes_through_goal(point1, point2, goal_area, num_samples=10):
     return False  # No points along the line were in the goal area
 
 def project_to_left_wall(point, goal_area):
+    
     # Project a point onto the left wall of the goal area
     x_min = min([coord[0] for coord in goal_area])
     y_min = min([coord[1] for coord in goal_area])
