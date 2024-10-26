@@ -610,7 +610,7 @@ def main():
         choice = int(choice)
     else:
         print("Invalid input. Please enter a number.")
-        continue
+        return
 
     if choice == 1:
         model_creation(start_pos, goal_area, walls, outside_walls)
@@ -625,7 +625,6 @@ def main():
         exit()
     elif choice == 4:
         print("Exiting the program. Goodbye!")
-        break
     else:
         print("Invalid option. Please try again.")
 
