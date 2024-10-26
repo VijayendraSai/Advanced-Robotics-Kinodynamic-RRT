@@ -636,10 +636,11 @@ def main():
     start_pos = [0, 0]
 
     print("\nMenu:")
-    print("1. Model Creation")
+    print("1. Model Simulation")
     print("2. Tree Visualization")
-    print("3. Planning Time")
-    print("4. Quit")
+    print("3. Planning Time Success Rate")
+    print("4. Execution Time Success Rate")
+    print("5. Quit")
     
     # allow the user to determine which objective to run
     choice = input("Enter your choice: ")
@@ -660,6 +661,12 @@ def main():
             print(f'Starting {num_trials} trails for {Tmax} seconds')
             run_planning_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
     elif choice == 4:
+        num_trials = 30
+        # run all the trails in a loop with changing time
+        for Tmax in [30, 20, 10, 5]:
+            print(f'Starting {num_trials} trails for {Tmax} seconds')
+            run_execution_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
+    elif choice == 5:
         print("Exiting the program. Goodbye!")
     else:
         print("Invalid option. Please try again.")
