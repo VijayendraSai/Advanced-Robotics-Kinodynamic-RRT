@@ -5,11 +5,11 @@
 \usepackage{float}
 \usepackage{geometry}
 \usepackage{hyperref}
+\usepackage{subcaption}
 \geometry{a4paper, margin=1in}
 
-
-\title{Ball and Rectangle}
-\author{Mark Doughten, Shubham Patil, Vijayendra Sai Chennareddy}
+\title{Kinodynamic RRT with PID Control for Obstacle Avoidance in a MuJoCo Environment}
+\author{Mark Doughten, Vijayendra Sai Chennareddy, Shubham Patil}
 \date{\today}
 
 \begin{document}
@@ -17,54 +17,54 @@
 \maketitle
 
 \section{Introduction}
-In robotics, autonomous path planning and control are crucial aspects of robot navigation, particularly in environments with obstacles. The objective of this project is impementing a hybrid approach that combines kinodynamic Rapidly-exploring Random Tree (RRT) for path planning and Proportional-Integral-Derivative (PID) controllers for executing the motion along the planned path. This work is demonstrated using a ball in a MuJoCo simulation environment, where the ball navigates through an environment containing walls and boundaries. The goal is moving the ball from a starting position to a goal position while avoiding obstacles using the kinodynamic RRT algorithm and accurately controlling the movement with PID.
+In robotics, autonomous path planning and control are crucial aspects of robot navigation, particularly in environments with obstacles. The objective of this project is to implement a hybrid approach that combines kinodynamic Rapidly-exploring Random Tree (RRT) for path planning and Proportional-Integral-Derivative (PID) controllers for executing the motion along the planned path. This work is demonstrated using a ball in a MuJoCo simulation environment, where the ball navigates through an environment containing walls and boundaries. The goal is to move the ball from a starting position to a goal position while avoiding obstacles using the kinodynamic RRT algorithm and accurately controlling the movement with PID.
 
 \subsection{Objectives}
-The main challenge is efficiently generating a collision-free path from a start point to a goal point in a cluttered environment and ensure the ball follows this path with minimal deviation. We took the following steps to achieve the objective.
+The main challenge is efficiently generating a collision-free path from a start point to a goal point in a cluttered environment and ensuring the ball follows this path with minimal deviation. We undertook the following steps to achieve this objective:
 \begin{itemize}
-    \item Foremost getting Mujoco running and generating models. There are plenty to choice from and I particularly enjoyed Newton's cradle with no gravity. 
-    \item The first step was creating a basic path finding technique in a 3D environment with a rectangular obstacle and using Dijkstra for path selection. The control were set values with a ramp up and slow down for controlling the velocity. 
+    \item Configuring MuJoCo and exploring various models, including Newton’s cradle with no gravity.
+    \item Developing basic pathfinding in a 3D environment using Dijkstra’s algorithm for initial path selection and fixed velocity controls.
     \begin{figure}[h!]
-      \centering
-      \includegraphics[width=0.5\textwidth]{./images/trapezoidal.png}
-      \caption{Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\))}
-      \label{fig:sample_image}
+        \centering
+        \includegraphics[width=0.5\textwidth]{./images/trapezoidal.png}
+        \caption{Trapezoidal decomposition (\(\mathcal{C} = \mathbb{R}^3_{\text{max}}\))}
+        \label{fig:trapezoidal}
     \end{figure}
-    \item Next we upgraded the Trapezoidal decomposition to a kinodynamic RRT for better path finding with a safety margin around the obstacles. 
+    \item Enhancing pathfinding with kinodynamic RRT, incorporating a safety margin around obstacles.
     \begin{figure}[h!]
-    \centering
-      \includegraphics[width=0.5\textwidth]{./images/kinodyanmics.png}
-      \caption{Kinodynamic RRT}
-      \label{fig:sample_image}
+        \centering
+        \includegraphics[width=0.5\textwidth]{./images/kinodyanmics.png}
+        \caption{Kinodynamic RRT}
+        \label{fig:kinodynamic}
     \end{figure}
-    \item Remove the basic controls and used a Proportional–integral–derivative (PID) controller for controlling the robot's movement to follow the planned path.
-    \item Throughout the process simulate the robot's movement in the MuJoCo physics engine and visualize the results.
+    \item Replacing basic controls with a Proportional-Integral-Derivative (PID) controller to follow the planned path.
+    \item Simulating and visualizing the robot’s movement within the MuJoCo physics engine.
 \end{itemize}
 
 \section{Environment}
-The environment consists of a 2D plane with predefined walls and boundaries. The simulation is conducted using the MuJoCo physics engine, which allows the creation and control of dynamic models. For this project, a ball is moved through the environment containing a set of obstacles to get to the goal. The model used is defined in the \texttt{ball\_square.xml} file, and the walls are represented as both external boundaries and internal obstacles.
+The environment consists of a 2D plane with predefined walls and boundaries. The simulation is conducted using the MuJoCo physics engine, which allows for the creation and control of dynamic models. For this project, a ball is moved through the environment containing a set of obstacles to reach the goal. The model used is defined in the \texttt{ball\_square.xml} file, and the walls are represented as both external boundaries and internal obstacles.
 
 \subsection{Map}
 \begin{itemize}
-    \item \textbf{Dimensions:} The 2D environment spans from $x = -0.5$ to $x = 1.5$ and $y = -0.4$ to $y = 0.4$.
+    \item \textbf{Dimensions:} The 2D environment spans from \(x = -0.5\) to \(x = 1.5\) and \(y = -0.4\) to \(y = 0.4\).
     \item \textbf{Obstacles:} A rectangular obstacle is placed in the middle of the environment between coordinates (0.5, -0.15) and (0.6, 0.15), acting as a wall.
     \item \textbf{Goal Area:} The target area for the robot is set between coordinates (0.9, -0.3) and (1.1, 0.3).
     \item \textbf{Boundaries:} The outer walls of the environment prevent the robot from moving outside the area.
 \end{itemize}
 
-    \begin{figure}[h]
+\begin{figure}[h]
     \centering
-      \includegraphics[width=0.5\textwidth]{./images/render.png}
-      \caption{Kinodynamic RRT}
-      \label{fig:sample_image}
-    \end{figure}
+    \includegraphics[width=0.5\textwidth]{./images/render.png}
+    \caption{Environment Setup}
+    \label{fig:environment}
+\end{figure}
 
 This setup ensures the presence of both static and dynamic constraints, making path planning non-trivial and control challenging.
 
 \section{Path Planning}
 
 \subsection{Algorithm Overview}
-Rapidly-exploring Random Trees (RRT) are widely used for motion planning in high-dimensional spaces. In this project, a kinodynamic variant of RRT is implemented. Unlike standard RRT, kinodynamic RRT accounts for the robot’s dynamics while generating the tree, ensuring that the planned path can be followed realistically by the robot. This approach helps in avoiding sharp or unrealistic turns that the robot may not be able to follow.
+Rapidly-exploring Random Trees (RRT) are widely used for motion planning in high-dimensional spaces. In this project, we implement a kinodynamic variant of RRT. Unlike standard RRT, the kinodynamic RRT accounts for the robot’s dynamics while generating the tree, ensuring that the planned path can be followed realistically by the robot. This approach helps avoid sharp or unrealistic turns that the robot may not be able to follow.
 
 The algorithm grows a tree from the start position by:
 \begin{enumerate}
@@ -75,41 +75,170 @@ The algorithm grows a tree from the start position by:
     \item Adding the new position to the tree if no collision occurs.
 \end{enumerate}
 
-This process repeats until the robot reaches the goal area or a maximum number of iterations is reached. The function \texttt{kinodynamic\_rrt} implements this process, and \texttt{simulate} handles the forward simulation of the robot’s dynamics.
+This process repeats until the robot reaches the goal area or a maximum number of iterations is reached. The function \texttt{kinodynamic\_rrt} implements this process, while \texttt{simulate} handles the forward simulation of the robot’s dynamics.
     
 \begin{figure}[h]
     \centering
-      \includegraphics[width=0.5\textwidth]{./images/path.png}
-      \caption{Kinodynamic RRT}
-      \label{fig:sample_image}
-    \end{figure}
+    \includegraphics[width=0.5\textwidth]{./images/path.png}
+    \caption{Kinodynamic RRT}
+    \label{fig:sample_image}
+\end{figure}
+
+\subsection{Purpose of \texttt{simulate()} in \texttt{kinodynamic\_rrt}}
+In traditional RRT, paths are generated based solely on geometric feasibility. However, for real systems with dynamic constraints, \texttt{simulate()} serves several critical functions:
+\begin{itemize}
+    \item \textbf{Ensures Dynamic Feasibility:} Calculates movement towards each sampled point, adjusting with PID control.
+    \item \textbf{Incremental Adjustment:} Makes small, corrective adjustments to follow a feasible path.
+    \item \textbf{Collision-Free Verification:} Confirms both geometric and dynamic feasibility.
+    \item \textbf{Realistic Path Execution:} Validates that each RRT segment can be executed under real-world constraints.
+\end{itemize}
     
 \subsection{Collision Avoidance}
-Collision detection is handled by the function \texttt{is\_collision\_free}, which checks if the robot’s new position lies within any of the obstacle regions or the environment boundaries. A safety margin is applied to ensure that the robot does not approach obstacles too closely.
+Collision detection is handled by the function \texttt{is\_collision\_free}, which checks if the robot’s new position lies within any of the obstacle regions or the environment boundaries. A safety margin is applied to ensure that the robot does not approach obstacles too closely. The function \texttt{is\_collision\_free\_line} checks if a straight line between two points is free of obstacles by verifying that there are no collisions with specified walls.
 
 \subsection{Path Construction}
-If the algorithm successfully finds a path to the goal, the tree is traversed back from the goal node to the start node to construct the path. The function \texttt{construct\_path} handles this backtracking. Finally, the path is visualized, which shows the path, the environment boundaries, and the obstacles.
+Once the algorithm successfully identifies a path to the goal, the tree is traversed from the goal node back to the start node to construct the complete path. This backtracking process is handled by the function \texttt{construct\_path}. The final path is then visualized, displaying the trajectory, environmental boundaries, and any obstacles encountered along the way.
+
+When a path is established between two nodes, the function \texttt{line\_goes\_through\_goal} checks if the path intersects with the goal area by interpolating and sampling points along the path. If an intersection is detected, the endpoint is adjusted to the coordinates (0.9, y) based on the last generated point. This modification effectively minimizes the distance required to reach the goal, as evidenced by the time trial paths.
+
+\subsection{Path Smoothing}
+After selecting the path within the Rapidly-exploring Random Tree, post-processing occurs using the \texttt{smooth\_path} function. This function randomly selects points in the graph to determine if they can be directly connected while eliminating intermediate points. As a result, the path is reduced to a series of critical waypoints, simplifying navigation. This reduction allows the control implementation to restart upon reaching each subsequent point, providing the controller with adequate time to complete the feedback loop before moving on to the next waypoint.
 
 \section{Navigation}
 
 \subsection{PID Controller Overview}
-Proportional-Integral-Derivative (PID) controllers are commonly used in control systems to achieve stable and accurate control. In this project, two PID controllers are implemented: one for controlling the movement of the ball in the $x$-direction and the other for the $y$-direction. Each controller computes the control input based on the error between the current and target positions, aiming to reduce this error over time.
+Proportional-Integral-Derivative (PID) controllers are commonly used in control systems to achieve stable and accurate control. In this project, two PID controllers are implemented: one for controlling the movement of the ball in the \(x\)-direction and the other for the \(y\)-direction. Each controller computes the control input based on the error between the current and target positions, aiming to reduce this error over time.
 
 The function \texttt{move\_ball\_to\_position\_with\_pid} implements the control loop, where the ball’s current position is compared to the target position from the planned path. The PID controllers compute the necessary force to move the ball toward the target, and the control inputs are applied in each iteration of the simulation.
 
 \subsection{Adjusting PID Gains}
-The gains for the PID controllers were manually tuned to achieve smooth movement without overshooting. The proportional (\texttt{kp}), integral (\texttt{ki}), and derivative (\texttt{kd}) gains were set as follows:
+The gains for the PID controllers were manually tuned to achieve smooth movement without overshooting. This tuning required observing the patterns in the model simulation and adjusting accordingly; no penalty for previous errors was applied. The proportional (\texttt{kp}), integral (\texttt{ki}), and derivative (\texttt{kd}) gains were set as follows:
 \begin{itemize}
-    \item \textbf{Proportional Gain (kp):} 0.1 — provides a basic correction based on the current error.
-    \item \textbf{Integral Gain (ki):} 0 — was not used in this implementation to avoid cumulative errors from drift.
-    \item \textbf{Derivative Gain (kd):} 0.4 — helps to smooth the response by anticipating future errors based on the rate of change.
+    \item \textbf{Proportional Gain (\texttt{kp}):} 0.58 — provides a basic correction based on the current error.
+    \item \textbf{Integral Gain (\texttt{ki}):} 0 — not used in this implementation to avoid cumulative errors from drift.
+    \item \textbf{Derivative Gain (\texttt{kd}):} 0.5 — helps to smooth the response by anticipating future errors based on the rate of change.
 \end{itemize}
 
+The higher proportional gain results in more aggressive error correction, which was necessary to achieve trials below a certain time threshold. Once the new point is set, the ball minimizes the error by updating its velocity. The \(x\)-direction and \(y\)-direction have the same controller configuration for symmetry. The same controllers are used to simulate the motion planning between two nodes in the Rapidly-exploring Random Tree.
+
 \subsection{Path Following}
-The PID controllers move the ball sequentially through each point in the planned path. The movement is clamped to prevent overshooting, and the simulation continues until the ball reaches the goal position with minimal error (set to 0.05 in this case).
+The PID controllers move the ball sequentially through each point in the planned path. Movement is clamped to prevent overshooting, and the simulation continues until the ball reaches the goal position with minimal error (set to 0.075 in this case). 
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{./images/deviation.png}
+    \caption{Path Deviation}
+    \label{fig:path_deviation}
+\end{figure}
+ 
+The deviation is calculated using the \texttt{calculate\_deviation} function. This feedback is important for determining how far the ball is from the trajectory, what adjustments to the controllers are necessary, and ensuring that the ball will not collide with obstacles between two points.
 
 \subsection{Control Challenges}
-Some challenges in the control process included handling sharp turns in the path and adjusting the control parameters to prevent oscillations. The derivative gain played a crucial role in damping the response and ensuring smooth transitions between points.
+Several challenges arise during the control process, including handling sharp turns in the path and adjusting the control parameters to prevent oscillations. The derivative gain plays a crucial role in damping the response and ensuring smooth transitions between points.
+
+\subsection{Path Visualization and Obstacle Mapping}
+The function \texttt{visualize\_final\_tree} generates a graphical representation of the kinodynamic RRT, illustrating the exploration process and highlighting the path to the goal.
+
+
+\subsection{Dynamic Speed Adjustment for Smooth Deceleration}
+The function \texttt{update\_speed} adjusts the robot's speed based on its distance from the goal, allowing for controlled deceleration to avoid overshooting.
+
+\section{Results}
+
+\subsection{Visualize trees for 5 different trials}
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/tree1.png}
+        \caption{Trial 1}
+        \label{fig:tree_1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/tree2.png}
+        \caption{Trial 2}
+        \label{fig:tree_2}
+    \end{subfigure}
+    
+    \vspace{0.5cm} % Adds some vertical space between rows
+
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/tree3.png}
+        \caption{Trial 3}
+        \label{fig:tree_3}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/tree4.png}
+        \caption{Trial 4}
+        \label{fig:tree_4}
+    \end{subfigure}
+
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/tree5.png}
+        \caption{Trial 5}
+        \label{fig:tree_5}
+    \end{subfigure}
+
+    \caption{Visualization of trees for different trials.}
+    \label{fig:trials}
+\end{figure}
+
+\subsection{Success Rates for Time Trial}
+
+The \texttt{run\_trial} function conducts multiple trials to evaluate the success rate of the PID-controlled robot in reaching the target area within a defined time limit
+
+\subsubsection{Path Exploration}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/5.png}
+        \caption{Tmax = 5}
+        \label{fig:5.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/10.png}
+        \caption{Tmax = 10}
+        \label{fig:10.png}
+    \end{subfigure}
+    
+    \vspace{0.5cm} % Adds some vertical space between rows
+
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/20.png}
+        \caption{Tmax = 20}
+        \label{fig:20.png}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./images/30.png}
+        \caption{Tmax = 30}
+        \label{fig:30.png}
+    \end{subfigure}
+
+    \caption{Visualization of path exploration}
+    \label{fig:Time Trails}
+\end{figure}
+
+
+\subsubsection{Success Rates}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{./images/success.png}
+    \caption{Succees Rates}
+    \label{fig:Succees Rates}
+\end{figure}
 
 \section{Conclusion}
 This project successfully integrated kinodynamic RRT for path planning and PID control for path execution in a simulated 3D environment. By leveraging these techniques, ball can navigate a complex environment with obstacles and boundaries while accurately following the planned path to the goal.
