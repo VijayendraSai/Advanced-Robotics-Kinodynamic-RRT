@@ -91,6 +91,7 @@ def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=Non
     return path_found, T  # Return None if no path is found
 
 def line_goes_through_goal(point1, point2, goal_area, num_samples=10):
+    
     # Sample points along the line from point1 to point2
     for t in range(1, num_samples):
         # Interpolating points between point1 and point2
@@ -105,6 +106,7 @@ def line_goes_through_goal(point1, point2, goal_area, num_samples=10):
     return False  # No points along the line were in the goal area
 
 def project_to_left_wall(point, goal_area):
+    
     # Project a point onto the left wall of the goal area
     x_min = min([coord[0] for coord in goal_area])
     y_min = min([coord[1] for coord in goal_area])
@@ -567,8 +569,8 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
         model = mujoco.MjModel.from_xml_path("ball_square.xml")
         data = mujoco.MjData(model)
         
-        pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
-        pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
+        pid_x = PIDController(kp=.58, ki=0.0, kd=0.5)
+        pid_y = PIDController(kp=.58, ki=0.0, kd=0.5)
 
         # Generate a path using kinodynamic RRT
         path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls, tolerance=0.15, N=1000, plot=False, logging=False)
