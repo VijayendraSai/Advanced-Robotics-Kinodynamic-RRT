@@ -323,9 +323,7 @@ def init_glfw_window(model):
 
 def visualize_tree(tree, path, goal_area, walls, outside_walls, start_pos):
     plt.figure(figsize=(8, 6))
-    # ax = plt.gca()
-    
-    # Plot the middle obstacle
+
     if walls:
         if isinstance(walls, dict):
             wall_list = walls.values()
