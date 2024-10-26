@@ -31,7 +31,6 @@ class PIDController:
         d_term = self.kd * (error - self.previous_error) / dt
         self.previous_error = error
         
-        # Return the control output
         return p_term + i_term + d_term
 
 class Node:
