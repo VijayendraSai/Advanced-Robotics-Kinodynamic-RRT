@@ -79,7 +79,8 @@ def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=Non
                     break
 
     # Visualize the final tree after all nodes are created
-    visualize_final_tree(T, path_found, goal_area, walls, outside_walls, start_pos)
+    if plot:
+        visualize_final_tree(T, path_found, goal_area, walls, outside_walls, start_pos)
 
     return path_found, T  # Return None if no path is found
 
@@ -228,10 +229,12 @@ def smooth_path(path, walls, max_attempts=50):
     
     return smoothed_path
 
-def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=None, outside_walls=None):
+def plot_path_with_boundaries_and_mixed_obstacles(paths, walls=None, goal_area=None, outside_walls=None):
+    
+    # Set up the plot
+    plt.figure(figsize=(8, 6))
     
     # Plot 2D walls as boxes if provided
-    plt.figure(figsize=(8, 6))
     if walls:
         for wall, coordinates in walls.items():
             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
@@ -247,23 +250,24 @@ def plot_path_with_boundaries_and_mixed_obstacles(path, walls=None, goal_area=No
         goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
         plt.gca().add_patch(goal_polygon)
 
-    # Plot the path
-    path = np.array(path)  # Ensure path is a numpy array
-    plt.plot(path[:, 0], path[:, 1], 'bo-', label='Path')
+    # Plot each path in the list with a random color
+    for path in paths:
+        path = np.array(path)  # Ensure path is a numpy array
+        random_color = [random.random() for _ in range(3)]  # Generate a random color
+        plt.plot(path[:, 0], path[:, 1], marker='o', color=random_color)
 
-    # Plot the start and goal positions
-    plt.plot(path[0, 0], path[0, 1], 'go', label='Start', markersize=10)
-    plt.plot(path[-1, 0], path[-1, 1], 'ro', label='Goal', markersize=10)
+        # Plot the start and goal positions for each path
+        plt.plot(path[0, 0], path[0, 1], 'go', markersize=10)  # Start point
+        plt.plot(path[-1, 0], path[-1, 1], 'ro', markersize=10)  # Goal point
 
-    # Set limits
+    # Set plot limits
     plt.xlim(-0.6, 1.6)
     plt.ylim(-0.5, 0.5)
 
     # Add labels and title
     plt.xlabel("X Position")
     plt.ylabel("Y Position")
-    plt.title("Kinodynamic RRT Path with Map Boundaries and Obstacles")
-    plt.legend()
+    plt.title("Kinodynamic RRT Paths with Map Boundaries and Obstacles")
 
     # Show the plot
     plt.grid(True)
@@ -321,15 +325,18 @@ def render_scene(model, data, options, scene, context, viewport, camera, window)
     
     return
 
-def move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y):
+def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, scene=None, context=None, options=None, viewport=None, camera=None, plot_enabled=True, render_enabled=True):
     
     ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")
     dt = 0.01
-    fig, ax, line_dev = initialize_plot()
     time_data, deviation_data = [], []
     time_elapsed = 0
     max_speed, min_speed = 10, 1
     slowdown_distance = 1.25
+    
+    # Initialize plot if plotting is enabled
+    if plot_enabled:
+        fig, ax, line_dev = initialize_plot()
 
     for i in range(len(path) - 1):
         start_pos = np.array(path[i])
@@ -354,79 +361,28 @@ def move_ball_along_path_with_pid(model, data, path, window, scene, context, opt
 
             data.ctrl[0], data.ctrl[1] = control_x, control_y
             mujoco.mj_step(model, data)
-            render_scene(model, data, options, scene, context, viewport, camera, window)
+            
+            # Render the scene if rendering is enabled
+            if render_enabled:
+                render_scene(model, data, options, scene, context, viewport, camera, window)
 
-            deviation = calculate_deviation(start_pos, end_pos, ball_pos)
-            deviation_data.append(deviation)
-            time_data.append(time_elapsed)
-            line_dev.set_xdata(time_data)
-            line_dev.set_ydata(deviation_data)
-            ax.set_xlim(0, max(10, time_elapsed + 1))
-            fig.canvas.draw()
-            fig.canvas.flush_events()
+            # Plot deviation if plotting is enabled
+            if plot_enabled:
+                deviation = calculate_deviation(start_pos, end_pos, ball_pos)
+                deviation_data.append(deviation)
+                time_data.append(time_elapsed)
+                line_dev.set_xdata(time_data)
+                line_dev.set_ydata(deviation_data)
+                ax.set_xlim(0, max(10, time_elapsed + 1))
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+
             time_elapsed += dt
     
-    plt.close() 
-    return time_elapsed
+    # Close the plot if it was enabled
+    if plot_enabled:
+        plt.close() 
 
-def planning_time(pid_x, pid_y, model, data, path):
-    
-    ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")  # Get ball body ID
-    dt = 0.01  # Time step
-    time_elapsed = 0
-    max_speed = 8  # Maximum speed of the ball
-    min_speed = 1   # Minimum speed when close to the point
-    slowdown_distance = 1.25  # Distance at which to start slowing down
-
-    # Iterate over the path segments (line between each pair of nodes)
-    for i in range(len(path) - 1):
-        
-        start_pos = np.array(path[i])
-        end_pos = np.array(path[i + 1])
-        line_direction = end_pos - start_pos
-        line_length = np.linalg.norm(line_direction)
-        line_direction_normalized = line_direction / line_length
-
-        while True:
-            ball_pos = data.xpos[ball_id][:2]  # Get current ball position (x, y)
-            
-            # Compute vector to the end position
-            ball_to_end = end_pos - ball_pos
-            distance_to_goal = np.linalg.norm(ball_to_end)
-
-            # If the ball is very close to the end of the segment, move to the next segment
-            if distance_to_goal < 0.05:
-                print("Reached node", i + 1)
-                break
-
-            # Dynamically calculate the desired speed based on the distance to the next point
-            if distance_to_goal < slowdown_distance:
-                desired_speed = max(min_speed, (distance_to_goal / slowdown_distance) * max_speed)
-            else:
-                desired_speed = max_speed
-
-            # Adjust PID controller gains dynamically for x and y directions
-            control_x = pid_x.compute(ball_pos[0], dt)
-            control_y = pid_y.compute(ball_pos[1], dt)
-
-            # Normalize the control signals to match the desired speed
-            control_vector = np.array([control_x, control_y])
-            control_magnitude = np.linalg.norm(control_vector)
-            
-            if control_magnitude > 0:
-                control_vector_normalized = control_vector / control_magnitude
-                control_x = control_vector_normalized[0] * desired_speed
-                control_y = control_vector_normalized[1] * desired_speed
-
-            # Apply control to the ball's actuators
-            data.ctrl[0] = control_x  # x direction control
-            data.ctrl[1] = control_y  # y direction control
-            
-            mujoco.mj_step(model, data)
-
-            # Update time elapsed
-            time_elapsed += dt
-            
     return time_elapsed
 
 def visualize_final_tree(tree, path, goal_area=None, walls=None, outside_walls=None, start_pos=None):
@@ -527,9 +483,8 @@ def model_creation(start_pos, goal_area, walls, outside_walls):
     path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls)
     
     if path:
-        
-        #path = smooth_path(path, walls)  # Smooth the path
-        plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
+        path = smooth_path(path, walls)  # Smooth the path
+        plot_path_with_boundaries_and_mixed_obstacles([path], walls, goal_area, outside_walls)
         
         pid_x = PIDController(kp=.6, ki=0.0, kd=0.5)
         pid_y = PIDController(kp=.6, ki=0.0, kd=0.5)
@@ -538,7 +493,7 @@ def model_creation(start_pos, goal_area, walls, outside_walls):
         window, camera, scene, context, options, viewport = init_glfw_window(model)
         
         # Control the ball to follow the path
-        move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y)
+        move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window, scene, context, options, viewport, camera)
     
     else:
         print("No path found")
@@ -554,23 +509,29 @@ def tree_visualization(start_pos, walls, goal_area, outside_walls):
     pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
     
     for trial in range(5):
-        seed = trial
+        seed = generate_random_seed()
         random.seed(seed)
         np.random.seed(seed)
-        path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls)
+        path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls, tolerance=0.15, N=1000, plot=True)
         print(f"Trial {trial + 1} - Path: {'Found' if path else 'Not Found'}")
-        visualize_tree(tree, path, goal_area, walls, outside_walls, start_pos)
 
     return
+
+def generate_random_seed():
+    seed = random.randint(0, 2**32 - 1)  # Generate a random integer seed within a 32-bit range
+    return seed
 
 def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
     
     success_count = 0
     plan_time = -1
+    paths = []
     
     for trial in range(num_trials):
+        
         print(f"Running trial {trial + 1}/{num_trials}...")
-
+        seed = generate_random_seed()
+        
         # Load the MuJoCo model
         model = mujoco.MjModel.from_xml_path("ball_square.xml")
         data = mujoco.MjData(model)
@@ -579,14 +540,16 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
         pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
 
         # Generate a path using kinodynamic RRT
-        path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls)
+        path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls, tolerance=0.15, N=1000, plot=False)
         
         if path:
+            
             # Smooth the path to avoid obstacles
             path = smooth_path(path, walls)
+            paths.append(path)
             
             # Calculate planning time for the smoothed path
-            plan_time = planning_time(pid_x, pid_y, model, data, path)
+            plan_time = move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, plot_enabled=False, render_enabled=False)
             print(f"Planning time: {plan_time:.2f} seconds")
 
             # Check if the planning time is within the allowed limit
@@ -601,7 +564,8 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
     # Report the success rate after all trials
     success_rate = (success_count / num_trials) * 100
     print(f"Success rate over {num_trials} trials: {success_rate:.2f}%")
-
+    plot_path_with_boundaries_and_mixed_obstacles(paths, walls, goal_area, outside_walls)
+    
     return
 
 def main():
@@ -644,11 +608,9 @@ def main():
             if choice == 1:
                 model_creation(start_pos, goal_area, walls, outside_walls)
             elif choice == 2:
-                tree_visualization(pid_x, pid_y, start_pos, walls, goal_area, outside_walls)
+                tree_visualization(start_pos, walls, goal_area, outside_walls)
             elif choice == 3:
-                num_trials = 10
-                print("start_pos:", start_pos)
-                
+                num_trials = 30
                 Tmax_input = input("Enter Tmax: ")
                 if Tmax_input.isdigit():
                     Tmax = int(Tmax_input)
@@ -658,8 +620,7 @@ def main():
                 else:
                     print("Invalid input. Please enter a positive integer.")
                     continue
-                
-                run_trials(pid_x, pid_y, start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
+                run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
             elif choice == 4:
                 print("Exiting the program. Goodbye!")
                 break
