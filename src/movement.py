@@ -346,14 +346,14 @@ def render_scene(model, data, options, scene, context, viewport, camera, window)
     
     return
 
-def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, scene=None, context=None, options=None, viewport=None, camera=None, plot_enabled=True, render_enabled=True, logging=True):
+def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, scene=None, context=None, options=None, viewport=None, camera=None, plot_enabled=True, render_enabled=True, logging=True, Tmax=120):
     
     ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")
     dt = 0.01
     time_data, deviation_data = [], []
     time_elapsed = 0
-    max_speed, min_speed = 10, 1
-    slowdown_distance = 1
+    max_speed, min_speed = 15, 1.25
+    slowdown_distance = .75
     
     # Initialize plot if plotting is enabled
     if plot_enabled:
@@ -368,9 +368,11 @@ def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, 
         pid_x.setpoint, pid_y.setpoint = end_pos[0], end_pos[1]
 
         while True:
+            
             ball_pos = data.xpos[ball_id][:2]
             distance_to_goal = np.linalg.norm(end_pos - ball_pos)
-            if distance_to_goal < 0.05:
+            
+            if distance_to_goal < 0.075:
                 if logging:
                     print("Reached node", i + 1)
                 break
@@ -404,6 +406,9 @@ def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, 
                 fig.canvas.flush_events()
 
             time_elapsed += dt
+
+            if time_elapsed > Tmax:
+                break
     
     # Close the plot if it was enabled
     if plot_enabled:
@@ -512,8 +517,8 @@ def model_creation(start_pos, goal_area, walls, outside_walls):
         path = smooth_path(path, walls, outside_walls)  # Smooth the path
         plot_path_with_boundaries_and_mixed_obstacles([path], walls, goal_area, outside_walls)
         
-        pid_x = PIDController(kp=.5, ki=0.0, kd=0.5)
-        pid_y = PIDController(kp=.5, ki=0.0, kd=0.5)
+        pid_x = PIDController(kp=.58, ki=0.0, kd=0.5)
+        pid_y = PIDController(kp=.58, ki=0.0, kd=0.5)
         
         # Initialize the window and visualization structures
         window, camera, scene, context, options, viewport = init_glfw_window(model)
@@ -575,7 +580,7 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
             paths.append(path)
             
             # Calculate planning time for the smoothed path
-            plan_time = move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, plot_enabled=False, render_enabled=False, logging=True)
+            plan_time = move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, plot_enabled=False, render_enabled=False, logging=False, Tmax=Tmax)
             print(f"Planning time: {plan_time:.2f} seconds")
 
             # Check if the planning time is within the allowed limit
@@ -636,17 +641,18 @@ def main():
             elif choice == 2:
                 tree_visualization(start_pos, walls, goal_area, outside_walls)
             elif choice == 3:
-                num_trials = 15
-                Tmax_input = input("Enter Tmax: ")
-                if Tmax_input.isdigit():
-                    Tmax = int(Tmax_input)
-                    if Tmax <= 0:
-                        print("Please enter a positive integer for Tmax.")
-                        continue
-                else:
-                    print("Invalid input. Please enter a positive integer.")
-                    continue
-                run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
+                num_trials = 30
+                #Tmax_input = input("Enter Tmax: ")
+                #if Tmax_input.isdigit():
+                #    Tmax = int(Tmax_input)
+                #    if Tmax <= 0:
+                #        print("Please enter a positive integer for Tmax.")
+                #        continue
+                #else:
+                #    print("Invalid input. Please enter a positive integer.")
+                #    continue
+                for Tmax in [30, 20, 10, 5]:
+                    run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
             elif choice == 4:
                 print("Exiting the program. Goodbye!")
                 break
