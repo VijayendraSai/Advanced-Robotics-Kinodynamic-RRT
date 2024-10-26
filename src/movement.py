@@ -57,51 +57,53 @@ def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=Non
         
         xrand = sample_random_position(goal_area)  # Sample a random position in the environment
         xnear = nearest(T, xrand) # Find the nearest node in the tree
+       
+        if is_collision_free(xrand, walls):
 
-        # Set PID controller setpoints for the sampled target
-        pid_x.setpoint, pid_y.setpoint = xrand[0], xrand[1]
+            # Set PID controller setpoints for the sampled target
+            pid_x.setpoint, pid_y.setpoint = xrand[0], xrand[1]
 
-        # Simulate the new position with iterative control steps
-        xe = simulate(pid_x, pid_y, xnear.position, xrand, tolerance=tolerance, max_steps=10000, dt=0.01)
+            # Simulate the new position with iterative control steps
+            xe = simulate(pid_x, pid_y, xnear.position, xrand, tolerance=tolerance, max_steps=50, dt=0.01)
 
-        # Check if the path segment from xnear to xe is collision-free
-        if is_collision_free_line(xnear.position, xe, walls, num_samples=100):
-            new_node = Node(xe, parent=xnear)
-            new_node.control = (pid_x.compute(xe[0], dt=0.01), pid_y.compute(xe[1], dt=0.01))
-            T.append(new_node)
+            # Check if the path segment from xnear to xe is collision-free
+            if is_collision_free_line(xnear.position, xe, walls, num_samples=100):
+                new_node = Node(xe, parent=xnear)
+                new_node.control = (pid_x.compute(xe[0], dt=0.01), pid_y.compute(xe[1], dt=0.01))
+                T.append(new_node)
 
-            # Check if xe is inside the goal area
-            if is_in_goal_area(xe, goal_area):
-                path_found = construct_path(new_node)  # Construct and return the path
-                print("Reached goal area")
-                break
+                # Check if xe is inside the goal area
+                if is_in_goal_area(xe, goal_area):
+                    path_found = construct_path(new_node)  # Construct and return the path
+                    print("Reached goal area")
+                    break
 
     # Visualize the final tree after all nodes are created
     visualize_final_tree(T, path_found, goal_area, walls, outside_walls, start_pos)
 
     return path_found, T  # Return None if no path is found
 
-def sample_random_position(goal_area=None, goal_bias=0.5):
+def sample_random_position(goal_area=None, goal_bias=0.2, bias_strength=0.5):
     
-    # With a probability of goal_bias, sample within the goal area
     if goal_area and random.random() < goal_bias:
+        # Calculate goal area center
+        x_center = sum(point[0] for point in goal_area) / len(goal_area)
+        y_center = sum(point[1] for point in goal_area) / len(goal_area)
         
-        # Calculate bounds for goal area
-        x_min = min(point[0] for point in goal_area)
-        x_max = max(point[0] for point in goal_area)
-        y_min = min(point[1] for point in goal_area)
-        y_max = max(point[1] for point in goal_area)
+        # Sample a random position
+        x = random.uniform(-0.5, 1.5)
+        y = random.uniform(-0.4, 0.4)
         
-        # Sample a point within the goal area bounds
-        x_goal = random.uniform(x_min, x_max)
-        y_goal = random.uniform(y_min, y_max)
-        
-        return np.array([x_goal, y_goal])
+        # Bias toward goal center
+        x = (1 - bias_strength) * x + bias_strength * x_center
+        y = (1 - bias_strength) * y + bias_strength * y_center
+
+        return np.array([x, y])
 
     x = random.uniform(-0.5, 1.5)
     y = random.uniform(-0.4, 0.4)
     
-    return np.array([x, y])  # Adjust to map bounds
+    return np.array([x, y])
 
 def nearest(T, xrand):
     return min(T, key=lambda node: np.linalg.norm(node.position - xrand))
@@ -170,6 +172,7 @@ def simulate(pid_x, pid_y, position, target_position, tolerance=0.05, max_steps=
     return current_position # Return the closest position and path if max_steps is reached
 
 def is_collision_free(xe, walls, safety_margin=.1):
+    
     # Check if the new position is out of bounds
     if xe[0] < -0.5 or xe[0] > 1.5 or xe[1] < -0.4 or xe[1] > 0.4:
         return False  # Outside the map bounds
@@ -326,7 +329,7 @@ def move_ball_along_path_with_pid(model, data, path, window, scene, context, opt
     time_data, deviation_data = [], []
     time_elapsed = 0
     max_speed, min_speed = 10, 1
-    slowdown_distance = 1.0
+    slowdown_distance = 1.25
 
     for i in range(len(path) - 1):
         start_pos = np.array(path[i])
@@ -363,7 +366,7 @@ def move_ball_along_path_with_pid(model, data, path, window, scene, context, opt
             fig.canvas.flush_events()
             time_elapsed += dt
     
-    plt.show() 
+    plt.close() 
     return time_elapsed
 
 def planning_time(pid_x, pid_y, model, data, path):
@@ -371,9 +374,9 @@ def planning_time(pid_x, pid_y, model, data, path):
     ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")  # Get ball body ID
     dt = 0.01  # Time step
     time_elapsed = 0
-    max_speed = 10  # Maximum speed of the ball
+    max_speed = 8  # Maximum speed of the ball
     min_speed = 1   # Minimum speed when close to the point
-    slowdown_distance = 1.0  # Distance at which to start slowing down
+    slowdown_distance = 1.25  # Distance at which to start slowing down
 
     # Iterate over the path segments (line between each pair of nodes)
     for i in range(len(path) - 1):
@@ -528,17 +531,19 @@ def model_creation(start_pos, goal_area, walls, outside_walls):
         #path = smooth_path(path, walls)  # Smooth the path
         plot_path_with_boundaries_and_mixed_obstacles(path, walls, goal_area, outside_walls)
         
-        pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
-        pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
+        pid_x = PIDController(kp=.6, ki=0.0, kd=0.5)
+        pid_y = PIDController(kp=.6, ki=0.0, kd=0.5)
         
         # Initialize the window and visualization structures
         window, camera, scene, context, options, viewport = init_glfw_window(model)
         
         # Control the ball to follow the path
         move_ball_along_path_with_pid(model, data, path, window, scene, context, options, viewport, camera, pid_x, pid_y)
+    
     else:
         print("No path found")
 
+    plt.close('all')
     glfw.terminate()
     
     return
