@@ -642,16 +642,8 @@ def main():
                 tree_visualization(start_pos, walls, goal_area, outside_walls)
             elif choice == 3:
                 num_trials = 30
-                #Tmax_input = input("Enter Tmax: ")
-                #if Tmax_input.isdigit():
-                #    Tmax = int(Tmax_input)
-                #    if Tmax <= 0:
-                #        print("Please enter a positive integer for Tmax.")
-                #        continue
-                #else:
-                #    print("Invalid input. Please enter a positive integer.")
-                #    continue
                 for Tmax in [30, 20, 10, 5]:
+                    print(f'Starting {num_trails} trails for {Tmax} seconds')
                     run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
             elif choice == 4:
                 print("Exiting the program. Goodbye!")
