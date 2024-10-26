@@ -8,26 +8,26 @@ import math
 
 class PIDController:
     def __init__(self, kp, ki, kd, setpoint=0):
-        self.kp = kp  # Proportional gain
-        self.ki = ki  # Integral gain
-        self.kd = kd  # Derivative gain
-        self.setpoint = setpoint  # Target value
+        self.kp = kp  
+        self.ki = ki  
+        self.kd = kd  
+        self.setpoint = setpoint
         self.previous_error = 0
         self.integral = 0
 
     def compute(self, current_value, dt):
         
-        # Compute error between current value and setpoint
+        # error between points
         error = self.setpoint - current_value
         
-        # Proportional term
+        # kp
         p_term = self.kp * error
         
-        # Integral term
+        # ki
         self.integral += error * dt
         i_term = self.ki * self.integral
         
-        # Derivative term
+        # kd
         d_term = self.kd * (error - self.previous_error) / dt
         self.previous_error = error
         
@@ -51,25 +51,26 @@ def is_in_goal_area(point, goal_area):
 
 def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=None, tolerance=0.10, N=1000, plot=True, logging=True):
     
-    T = [Node(start_pos)]  # Initialize the tree with the start node
+    T = [Node(start_pos)]    
     path_found = None
-    
+   
+    # run the search for points
     for _ in range(N):
         
-        xrand = sample_random_position(goal_area)  # Sample a random position in the environment
-        xnear = nearest(T, xrand)  # Find the nearest node in the tree
-       
+        xrand = sample_random_position(goal_area)
+        xnear = nearest(T, xrand) 
+        
+        # check that the point is collision free with the safety marging
         if is_collision_free(xrand, walls, outside_walls, safety_margin=0.01):
             
-            # Set PID controller setpoints for the sampled target
+            # simulate getting to the random point
             pid_x.setpoint, pid_y.setpoint = xrand[0], xrand[1]
-
-            # Simulate the new position with iterative control steps
             xe = simulate(pid_x, pid_y, xnear.position, xrand, tolerance=tolerance, max_speed=10, max_steps=500, dt=0.01, logging=logging)
 
-            # Check if the path segment from xnear to xe is collision-free
+            # check the line between the points is collison free
             if is_collision_free_line(xnear.position, xe, walls, outside_walls, num_samples=100):
-                # If the line goes through the goal area, project onto the left wall of the goal area
+                
+                # project back to the goal area
                 if line_goes_through_goal(xnear.position, xe, goal_area):
                     xe = project_to_left_wall(xe, goal_area)
 
@@ -77,14 +78,14 @@ def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=Non
                 new_node.control = (pid_x.compute(xe[0], dt=0.01), pid_y.compute(xe[1], dt=0.01))
                 T.append(new_node)
 
-                # Check if xe is inside the goal area
+                # stop condition
                 if is_in_goal_area(xe, goal_area):
                     path_found = construct_path(new_node)
-                    if logging:  # Log the success
+                    if logging:
                         print("Reached goal area")
                     break
 
-    # Visualize the final tree after all nodes are created
+    # see the full search tree
     if plot:
         visualize_final_tree(T, path_found, goal_area, walls, outside_walls, start_pos)
 
@@ -92,30 +93,28 @@ def kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=Non
 
 def line_goes_through_goal(point1, point2, goal_area, num_samples=10):
     
-    # Sample points along the line from point1 to point2
+    # sample points between line
     for t in range(1, num_samples):
-        # Interpolating points between point1 and point2
+        
+        # interpolating points for testing
         x = point1[0] + (point2[0] - point1[0]) * t / num_samples
         y = point1[1] + (point2[1] - point1[1]) * t / num_samples
         sample_point = (x, y)
         
         # Check if the sampled point is in the goal area
         if is_in_goal_area(sample_point, goal_area):
-            return True  # The line goes through the goal area
-    
-    return False  # No points along the line were in the goal area
+            return True 
+
+    return False
 
 def project_to_left_wall(point, goal_area):
     
-    # Project a point onto the left wall of the goal area
+    # project the point onto the left wall of goal area
     x_min = min([coord[0] for coord in goal_area])
     y_min = min([coord[1] for coord in goal_area])
     y_max = max([coord[1] for coord in goal_area])
-
-    # Clamp the y-coordinate to be within the bounds of the goal area vertically
     y_projected = max(min(point[1], y_max), y_min)
     
-    # Set the x-coordinate to the left wall (x_min)
     return (x_min, y_projected)
 
 def sample_random_position(goal_area=None, goal_bias=1, bias_strength=0.5):
@@ -134,165 +133,148 @@ def simulate(pid_x, pid_y, position, target_position, tolerance=0.05, max_steps=
 
     for step in range(max_steps):
         
-        # Calculate the control signal based on PID output
+        # calculate the control
         control_x = pid_x.compute(current_position[0], dt)
         control_y = pid_y.compute(current_position[1], dt)
         
-        # Create control vector and calculate its magnitude
+        # create control vector and calculate its magnitude
         control_vector = np.array([control_x, control_y])
         control_magnitude = np.linalg.norm(control_vector)
-        
-        # Calculate distance to target
         distance_to_target = np.linalg.norm(target_position - current_position)
-        
-        # Determine desired speed based on distance to target
+    
+        # determine desired speed based on distance to target
         if distance_to_target < slowdown_distance:
             desired_speed = min_speed + (max_speed - min_speed) * (distance_to_target / slowdown_distance)
         else:
             desired_speed = max_speed
 
-        # Scale the control vector to match the desired speed, if control is non-zero
+        # scale the controls based on speed
         if control_magnitude > 0:
             control_vector_normalized = control_vector / control_magnitude
             control_vector = control_vector_normalized * desired_speed
 
-        # Update the position based on the adjusted control action and time step
+        # update the position based on the adjusted control action and time step
         new_x = current_position[0] + control_vector[0] * dt
         new_y = current_position[1] + control_vector[1] * dt
         current_position = np.array([new_x, new_y])
 
-        # Debug statements for tracing
         if logging:
             print(f"Step {step}: Position={current_position}, Distance to Target={distance_to_target}, Desired Speed={desired_speed}")
 
-        # Check if within tolerance of the target position
         if distance_to_target <= tolerance:
-            return current_position # Return position and path if close enough to the target
+            return current_position
     
-    return current_position # Return the closest position and path if max_steps is reached
+    return current_position
 
 def point_line_distance(point, line_start, line_end):
     
-    # Calculate the distance from `point` to the line defined by `line_start` and `line_end`
     line_vec = np.array(line_end) - np.array(line_start)
     point_vec = np.array(point) - np.array(line_start)
     line_len = np.linalg.norm(line_vec)
     line_unitvec = line_vec / line_len
+    
     proj_length = np.dot(point_vec, line_unitvec)
     proj_point = np.array(line_start) + proj_length * line_unitvec
     distance = np.linalg.norm(point - proj_point)
     
-    # Check if the projected point lies on the line segment
     if 0 <= proj_length <= line_len:
         return distance
     else:
-        # Distance to the nearest endpoint if the projection is outside the line segment
         return min(np.linalg.norm(point - np.array(line_start)), np.linalg.norm(point - np.array(line_end)))
 
 def is_collision_free(xe, walls, outside_walls, safety_margin=0.1):
     
-    # Check if the new position is out of bounds
     if xe[0] < -0.5 or xe[0] > 1.5 or xe[1] < -0.4 or xe[1] > 0.4:
-        return False  # Outside the map bounds
+        return False
     
-    # Check if the new position collides with any obstacles (walls)
     for wall, coordinates in walls.items():
-        # Coordinates is a list of corner points of the wall (assumed rectangular here)
         x_min = min([coord[0] for coord in coordinates]) - safety_margin
         x_max = max([coord[0] for coord in coordinates]) + safety_margin
         y_min = min([coord[1] for coord in coordinates]) - safety_margin
         y_max = max([coord[1] for coord in coordinates]) + safety_margin
 
-        # Check if the new position xe lies within the bounds of the wall with the safety margin
         if x_min <= xe[0] <= x_max and y_min <= xe[1] <= y_max:
-            return False  # Collision with the wall (including safety margin)
+            return False
     
-    # Check for collisions with the outside walls
     for wall_line in outside_walls:
         line_start, line_end = wall_line
         if point_line_distance(xe, line_start, line_end) <= safety_margin:
-            return False  # Collision with outside wall
+            return False
 
     return True
 
 def is_collision_free_line(p1, p2, walls, outside_walls, num_samples=100):
     
     for t in np.linspace(0, 1, num_samples):
-        # Interpolate between p1 and p2
-        point = (1 - t) * np.array(p1) + t * np.array(p2)
         
+        # interpolate between p1 and p2
+        point = (1 - t) * np.array(p1) + t * np.array(p2)
         if not is_collision_free(point, walls, outside_walls):
-            return False  # If any point on the line collides, return False
+            return False
 
-    return True  # If no collisions, return True
+    return True
 
 def construct_path(node):
-    # Reconstruct the path from the goal node to the start node
+    
+    # reconstruct the path from the goal node to the start node
     path = []
     while node is not None:
         path.append(node.position)
         node = node.parent
-    return path[::-1]  # Return the path from start to goal
+    return path[::-1]
 
 def smooth_path(path, walls, outside_walls, max_attempts=20):
     
-    smoothed_path = list(path)  # Create a copy of the path
+    smoothed_path = list(path)
 
-    for _ in range(max_attempts):  # Perform smoothing for a fixed number of attempts
+    for _ in range(max_attempts):
         if len(smoothed_path) <= 2:
-            break  # If the path has only start and end, it's already smooth
+            break 
 
-        # Randomly select two points in the path
+        # randomly select two points in the path
         i, j = sorted(random.sample(range(len(smoothed_path)), 2))
 
-        # Check if a direct path between these two points is collision-free
+        # update the path when collison free
         if is_collision_free_line(smoothed_path[i], smoothed_path[j], walls, outside_walls):
-            # Remove the intermediate points and connect i to j directly
             smoothed_path = smoothed_path[:i + 1] + smoothed_path[j:]
     
     return smoothed_path
 
 def plot_path_with_boundaries_and_mixed_obstacles(paths, walls=None, goal_area=None, outside_walls=None):
     
-    # Set up the plot
     plt.figure(figsize=(8, 6))
     
-    # Plot 2D walls as boxes if provided
+    # plot 2d walls as boxes if provided
     if walls:
         for wall, coordinates in walls.items():
             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
             plt.gca().add_patch(wall_polygon)
 
-    # Plot outside walls as lines if provided
+    # plot outside walls as lines
     if outside_walls:
         for wall in outside_walls:
             plt.plot([wall[0][0], wall[1][0]], [wall[0][1], wall[1][1]], 'k-', lw=2)
 
-    # Plot the goal area as a 2D box if provided
+    # plot the goal area as a 2d box
     if goal_area:
         goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
         plt.gca().add_patch(goal_polygon)
 
-    # Plot each path in the list with a random color
+    # plot each path
     for path in paths:
-        path = np.array(path)  # Ensure path is a numpy array
-        random_color = [random.random() for _ in range(3)]  # Generate a random color
+        path = np.array(path)
+        random_color = [random.random() for _ in range(3)]
         plt.plot(path[:, 0], path[:, 1], marker='o', color=random_color)
 
         # Plot the start and goal positions for each path
-        plt.plot(path[0, 0], path[0, 1], 'go', markersize=10)  # Start point
-        plt.plot(path[-1, 0], path[-1, 1], 'ro', markersize=10)  # Goal point
+        plt.plot(path[0, 0], path[0, 1], 'go', markersize=10)
+        plt.plot(path[-1, 0], path[-1, 1], 'ro', markersize=10)
 
-    # Set plot limits
     plt.xlim(-0.6, 1.6)
     plt.ylim(-0.5, 0.5)
-
-    # Add labels and title
     plt.xlabel("X Position")
     plt.ylabel("Y Position")
     plt.title("Kinodynamic RRT Paths with Map Boundaries and Obstacles")
-
-    # Show the plot
     plt.grid(True)
     plt.show()
     
@@ -349,7 +331,8 @@ def render_scene(model, data, options, scene, context, viewport, camera, window)
     return
 
 def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, scene=None, context=None, options=None, viewport=None, camera=None, plot_enabled=True, render_enabled=True, logging=True, Tmax=120):
-    
+   
+    # set the parameters for the model
     ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")
     dt = 0.01
     time_data, deviation_data = [], []
@@ -357,11 +340,13 @@ def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, 
     max_speed, min_speed = 15, 1.25
     slowdown_distance = .75
     
-    # Initialize plot if plotting is enabled
+    # create the live plot for deviation
     if plot_enabled:
         fig, ax, line_dev = initialize_plot()
-
+    
+    # loop through each point and set the controllers and move until the next point is reached
     for i in range(len(path) - 1):
+        
         start_pos = np.array(path[i])
         end_pos = np.array(path[i + 1])
         line_direction = end_pos - start_pos
@@ -374,16 +359,19 @@ def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, 
             ball_pos = data.xpos[ball_id][:2]
             distance_to_goal = np.linalg.norm(end_pos - ball_pos)
             
+            # break when a point is reached
             if distance_to_goal < 0.075:
                 if logging:
                     print("Reached node", i + 1)
                 break
-
+            
+            # update the speed based on the slowdown distance
             desired_speed = update_speed(distance_to_goal, slowdown_distance, max_speed, min_speed)
 
             if logging:
                 print(f"Distance to goal: {distance_to_goal}, Desired speed: {desired_speed}")
-            
+           
+            # update the controllers based on new ball position
             control_x, control_y = apply_pid_control(pid_x, pid_y, ball_pos, dt, desired_speed)
 
             if logging:
@@ -392,11 +380,11 @@ def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, 
             data.ctrl[0], data.ctrl[1] = control_x, control_y
             mujoco.mj_step(model, data)
             
-            # Render the scene if rendering is enabled
+            # render the 3d
             if render_enabled:
                 render_scene(model, data, options, scene, context, viewport, camera, window)
 
-            # Plot deviation if plotting is enabled
+            # plot deviation from the line
             if plot_enabled:
                 deviation = calculate_deviation(start_pos, end_pos, ball_pos)
                 deviation_data.append(deviation)
@@ -412,17 +400,16 @@ def move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window=None, 
             if time_elapsed > Tmax:
                 break
     
-    # Close the plot if it was enabled
     if plot_enabled:
-        plt.close() 
+        plt.close(fig) 
+        plt.close('all')
 
     return time_elapsed
 
 def visualize_final_tree(tree, path, goal_area=None, walls=None, outside_walls=None, start_pos=None):
-    
+   
     plt.figure(figsize=(8, 6))
     
-    # Plot 2D walls as polygons if provided
     if walls:
         if isinstance(walls, dict):
             wall_list = walls.values()
@@ -435,36 +422,34 @@ def visualize_final_tree(tree, path, goal_area=None, walls=None, outside_walls=N
             wall_polygon = plt.Polygon(coordinates, color='red', alpha=0.5)
             plt.gca().add_patch(wall_polygon)
 
-    # Plot outside walls as lines if provided
+    # plot outside walls
     if outside_walls:
         for wall in outside_walls:
             plt.plot([wall[0][0], wall[1][0]], [wall[0][1], wall[1][1]], 'k-', lw=2)
 
-    # Plot the goal area as a 2D box if provided
+    # plot the goal area
     if goal_area:
         goal_polygon = plt.Polygon(goal_area, color='green', alpha=0.3)
         plt.gca().add_patch(goal_polygon)
 
-    # Plot the tree nodes and edges
+    # plot the tree nodes and edges
     for node in tree:
         if node.parent:
-            # Draw the edge from parent to node
             plt.plot([node.position[0], node.parent.position[0]],
-                     [node.position[1], node.parent.position[1]], 'b-', alpha=0.5)  # Blue edges for tree
-        # Draw the node itself
-        plt.plot(node.position[0], node.position[1], 'bo', markersize=2)  # Blue nodes
+                     [node.position[1], node.parent.position[1]], 'b-', alpha=0.5)
+        plt.plot(node.position[0], node.position[1], 'bo', markersize=2)
 
-    # Plot the start position if provided
+    # plot the start position
     if start_pos:
-        plt.plot(start_pos[0], start_pos[1], 'go', label='Start', markersize=10)  # Green dot for start position
+        plt.plot(start_pos[0], start_pos[1], 'go', label='Start', markersize=10)
 
-    # Plot the path if one was found
+    # plot the path
     if path:
-        path = np.array(path)  # Ensure path is a numpy array
-        plt.plot(path[:, 0], path[:, 1], 'c-', linewidth=2, label='Path')  # Cyan line for the path
-        plt.plot(path[-1, 0], path[-1, 1], 'ro', label='Goal', markersize=10)  # Red dot for goal position
+        path = np.array(path)
+        plt.plot(path[:, 0], path[:, 1], 'c-', linewidth=2, label='Path')
+        plt.plot(path[-1, 0], path[-1, 1], 'ro', label='Goal', markersize=10)
 
-    # Configure the plot
+    # configure the plot
     plt.xlim(-0.6, 1.6)
     plt.ylim(-0.5, 0.5)
     plt.xlabel("X Position")
@@ -498,46 +483,44 @@ def init_glfw_window(model):
     camera.elevation = -45.0
     camera.azimuth = 0.0
 
-    # Set viewport
     viewport = mujoco.MjrRect(0, 0, 1200, 900)
-
-    # Return the window, camera, scene, context, options, and viewport for rendering
     return window, camera, scene, context, options, viewport
 
 def model_creation(start_pos, goal_area, walls, outside_walls):
    
-    # Load the MuJoCo model
+    # load the MuJoCo model
     model = mujoco.MjModel.from_xml_path("ball_square.xml")
     data = mujoco.MjData(model)
     
-    # Perform Kinodynamic-RRT to find a path that reaches the goal area
+    # generate a path using the controllers and kinodyanmic_rrt
     pid_x = PIDController(kp=.5, ki=0.0, kd=0.5)
     pid_y = PIDController(kp=.5, ki=0.0, kd=0.5)
     path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls)
     
     if path:
-        path = smooth_path(path, walls, outside_walls)  # Smooth the path
+        path = smooth_path(path, walls, outside_walls)
         plot_path_with_boundaries_and_mixed_obstacles([path], walls, goal_area, outside_walls)
         
         pid_x = PIDController(kp=.58, ki=0.0, kd=0.5)
         pid_y = PIDController(kp=.58, ki=0.0, kd=0.5)
         
-        # Initialize the window and visualization structures
+        # create the window
         window, camera, scene, context, options, viewport = init_glfw_window(model)
         
-        # Control the ball to follow the path
+        # run the 3d simulation with the path and window objects
         move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, window, scene, context, options, viewport, camera)
     
     else:
         print("No path found")
 
-    plt.close('all')
     glfw.terminate()
+    plt.close('all')
     
     return
 
 def tree_visualization(start_pos, walls, goal_area, outside_walls):
-    
+   
+    # set the controllers for the kinodynamic rrt
     pid_x = PIDController(kp=.45, ki=0.0, kd=0.5)
     pid_y = PIDController(kp=.45, ki=0.0, kd=0.5)
     
@@ -545,13 +528,15 @@ def tree_visualization(start_pos, walls, goal_area, outside_walls):
         seed = generate_random_seed()
         random.seed(seed)
         np.random.seed(seed)
+        
+        # run the trail
         path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls, tolerance=0.15, N=1000, plot=True, logging=False)
         print(f"Trial {trial + 1} - Path: {'Found' if path else 'Not Found'}")
 
     return
 
 def generate_random_seed():
-    seed = random.randint(0, 2**32 - 1)  # Generate a random integer seed within a 32-bit range
+    seed = random.randint(0, 2**32 - 1)
     return seed
 
 def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
@@ -565,27 +550,27 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
         print(f"Running trial {trial + 1}/{num_trials}...")
         seed = generate_random_seed()
         
-        # Load the MuJoCo model
+        # load the MuJoCo model
         model = mujoco.MjModel.from_xml_path("ball_square.xml")
         data = mujoco.MjData(model)
         
         pid_x = PIDController(kp=.58, ki=0.0, kd=0.5)
         pid_y = PIDController(kp=.58, ki=0.0, kd=0.5)
 
-        # Generate a path using kinodynamic RRT
+        # generate a path using kinodynamic RRT
         path, tree = kinodynamic_rrt(pid_x, pid_y, start_pos, goal_area, walls, outside_walls=outside_walls, tolerance=0.15, N=1000, plot=False, logging=False)
         
         if path:
             
-            # Smooth the path to avoid obstacles
+            # smooth the path for less nodes
             path = smooth_path(path, walls, outside_walls)
             paths.append(path)
             
-            # Calculate planning time for the smoothed path
+            # record the execution time for the smoothed path
             plan_time = move_ball_along_path_with_pid(pid_x, pid_y, model, data, path, plot_enabled=False, render_enabled=False, logging=False, Tmax=Tmax)
             print(f"Planning time: {plan_time:.2f} seconds")
 
-            # Check if the planning time is within the allowed limit
+            # check the time
             if plan_time <= Tmax:
                 success_count += 1
                 print("Successfully reached the goal area!")
@@ -594,7 +579,7 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
         else:
             print("No path found.")
 
-    # Report the success rate after all trials
+    # report the success rate
     success_rate = (success_count / num_trials) * 100
     print(f"Success rate over {num_trials} trials: {success_rate:.2f}%")
     plot_path_with_boundaries_and_mixed_obstacles(paths, walls, goal_area, outside_walls)
@@ -602,59 +587,48 @@ def run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax):
     return
 
 def main():
-    # Define the goal area (a rectangular region)
-    goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
     
-    # Define outside walls as lines
+    # define the goal area, walls, and the starting position
+    goal_area = [[0.9, -0.3], [0.9, 0.3], [1.1, 0.3], [1.1, -0.3]]
     outside_walls = [
         [[-0.5, -0.4], [-0.5, 0.4]],
         [[1.5, -0.4], [1.5, 0.4]],
         [[-0.5, 0.4], [1.5, 0.4]],
-        [[-0.5, -0.4], [1.5, -0.4]]
-    ]
+        [[-0.5, -0.4], [1.5, -0.4]]]
+    walls = {"wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]}
+    start_pos = [0, 0]
 
-    # Define the middle obstacle
-    walls = {
-        "wall_3": [[0.5, -0.15], [0.5, 0.15], [0.6, 0.15], [0.6, -0.15]]
-    }
+    print("\nMenu:")
+    print("1. Model Creation")
+    print("2. Tree Visualization")
+    print("3. Planning Time")
+    print("4. Quit")
+    
+    # allow the user to determine which objective to run
+    choice = input("Enter your choice: ")
+    if choice.isdigit():
+        choice = int(choice)
+    else:
+        print("Invalid input. Please enter a number.")
+        continue
 
-    # Define the start position
-    start_pos = [0, 0]  # Starting at the origin
+    if choice == 1:
+        model_creation(start_pos, goal_area, walls, outside_walls)
+    elif choice == 2:
+        tree_visualization(start_pos, walls, goal_area, outside_walls)
+    elif choice == 3:
+        num_trials = 30
+        # run all the trails in a loop with changing time
+        for Tmax in [30, 20, 10, 5]:
+            print(f'Starting {num_trials} trails for {Tmax} seconds')
+            run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
+        exit()
+    elif choice == 4:
+        print("Exiting the program. Goodbye!")
+        break
+    else:
+        print("Invalid option. Please try again.")
 
-    while True:
-        try:
-            print("\nMenu:")
-            print("1. Model Creation")
-            print("2. Tree Visualization")
-            print("3. Planning Time")
-            print("4. Quit")
-            
-            choice = input("Enter your choice: ")
-            
-            if choice.isdigit():
-                choice = int(choice)
-            else:
-                print("Invalid input. Please enter a number.")
-                continue
-
-            if choice == 1:
-                model_creation(start_pos, goal_area, walls, outside_walls)
-            elif choice == 2:
-                tree_visualization(start_pos, walls, goal_area, outside_walls)
-            elif choice == 3:
-                num_trials = 30
-                for Tmax in [30, 20, 10, 5]:
-                    print(f'Starting {num_trials} trails for {Tmax} seconds')
-                    run_trials(start_pos, goal_area, walls, outside_walls, num_trials, Tmax)
-            elif choice == 4:
-                print("Exiting the program. Goodbye!")
-                break
-            else:
-                print("Invalid option. Please try again.")
-        
-        except KeyboardInterrupt:
-            print("\nProgram interrupted. Exiting gracefully.")
-            break
     return
 
 if __name__ == "__main__":
